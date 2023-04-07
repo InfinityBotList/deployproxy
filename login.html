@@ -8,10 +8,11 @@
     <meta name="keywords" content="Unauthorized">
 </head>
     <p>This deploy is protected, click the below button to login:</p>
-    <p><strong>URL: </strong>{{.URL}}</p>
-    <p><strong>Description: </strong>{{.Description}}</p>
-    <p><strong>Perms Needed: </strong>{{.Perms}}</p>
-    <a href="/__dp/login">
+    <p><strong>URL: </strong>{{.Deploy.URL}}</p>
+    <p><strong>Current URL: </strong>{{.CurrentURL}}</p>
+    <p><strong>Description: </strong>{{.Deploy.Description}}</p>
+    <p><strong>Perms Needed: </strong>{{.Deploy.Perms}}</p>
+    <a href="/__dp/login?url={{.CurrentURL}}">
         <button type="button">Log In</button>
     </a>
 </html>

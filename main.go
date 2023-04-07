@@ -15,6 +15,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"github.com/bwmarrin/discordgo"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/infinitybotlist/eureka/crypto"
@@ -29,6 +30,7 @@ var (
 	pool    *pgxpool.Pool
 	ctx     = context.Background()
 	rdb     *redis.Client
+	discord *discordgo.Session
 )
 
 //go:embed login.html
@@ -46,11 +48,6 @@ func loginView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.AddCookie(&http.Cookie{
-		Name:  "__redirect",
-		Value: r.URL.String(),
-	})
-
 	t, err := template.New("login").Parse(loginHTML)
 
 	if err != nil {
@@ -60,7 +57,10 @@ func loginView(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusUnauthorized)
-	t.Execute(w, deploy)
+	t.Execute(w, LoginView{
+		Deploy:     deploy,
+		CurrentURL: r.URL.Path,
+	})
 }
 
 func downView(w http.ResponseWriter, r *http.Request, reason string) {
@@ -179,6 +179,13 @@ func main() {
 
 	rdb = redis.NewClient(rOptions)
 
+	// Connect to discord, no intents though
+	discord, err = discordgo.New("Bot " + secrets.BotToken)
+
+	if err != nil {
+		panic(err)
+	}
+
 	// Create wildcard route
 	r := chi.NewRouter()
 
@@ -190,6 +197,9 @@ func main() {
 		middleware.Logger,
 		middleware.Timeout(30*time.Second),
 	)
+
+	// For github etc.
+	DeployRoutes(r)
 
 	r.HandleFunc("/__dp/logout", func(w http.ResponseWriter, r *http.Request) {
 		// Get session cookie
@@ -241,7 +251,7 @@ func main() {
 		}
 
 		// Redirect to oauth2 page
-		http.Redirect(w, r, "https://discord.com/api/oauth2/authorize?client_id="+secrets.ClientID+"&redirect_uri="+deploy.URL+"/__dp/confirm&scope=identify&response_type=code", http.StatusFound)
+		http.Redirect(w, r, "https://discord.com/api/oauth2/authorize?client_id="+secrets.ClientID+"&redirect_uri="+deploy.URL+"/__dp/confirm&scope=identify&response_type=code&state="+r.URL.Query().Get("url"), http.StatusFound)
 	})
 
 	r.HandleFunc("/__dp/confirm", func(w http.ResponseWriter, r *http.Request) {
@@ -396,15 +406,8 @@ func main() {
 			Path:     "/",
 		})
 
-		// Redirect to redirect cookie
-		redirect, err := r.Cookie("__redirect")
-
-		if err != nil {
-			http.Redirect(w, r, deploy.URL, http.StatusFound)
-			return
-		}
-
-		http.Redirect(w, r, redirect.Value, http.StatusFound)
+		// Redirect to state
+		http.Redirect(w, r, deploy.URL+r.URL.Query().Get("state"), http.StatusFound)
 	})
 
 	r.HandleFunc("/*", func(w http.ResponseWriter, r *http.Request) {
@@ -476,22 +479,24 @@ func main() {
 				w.Write([]byte("Error checking user"))
 			}
 
-			// Check perms
-			for _, permNeeded := range deploy.Perms {
-				switch permNeeded {
-				case PermAdmin:
-					var admin bool
+			if time.Now().Unix()-rsess.LastChecked > int64(5*time.Minute) {
+				// Check perms
+				for _, permNeeded := range deploy.Perms {
+					switch permNeeded {
+					case PermAdmin:
+						var admin bool
 
-					err = pool.QueryRow(ctx, "SELECT admin FROM users WHERE user_id = $1", rsess.UserID).Scan(&admin)
+						err = pool.QueryRow(ctx, "SELECT admin FROM users WHERE user_id = $1", rsess.UserID).Scan(&admin)
 
-					if err != nil {
-						panic(err)
-					}
+						if err != nil {
+							panic(err)
+						}
 
-					if !admin {
-						w.WriteHeader(http.StatusUnauthorized)
-						w.Write([]byte("You are not an admin"))
-						return
+						if !admin {
+							w.WriteHeader(http.StatusUnauthorized)
+							w.Write([]byte("You are not an admin"))
+							return
+						}
 					}
 				}
 			}
@@ -508,5 +513,9 @@ func main() {
 
 	// Start server
 	fmt.Println("Starting server on port 1234")
-	s.ListenAndServe()
+	err = s.ListenAndServe()
+
+	if err != nil {
+		panic(err)
+	}
 }
