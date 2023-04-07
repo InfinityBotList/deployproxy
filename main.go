@@ -112,7 +112,7 @@ func proxy(w http.ResponseWriter, r *http.Request, deploy Deploy) {
 	defer resp.Body.Close()
 
 	for k, v := range resp.Header {
-		if k == "Content-Type" || k == "Content-Encoding" {
+		if k == "Content-Type" || k == "Content-Encoding" || k == "Content-Security-Policy" {
 			w.Header()[k] = v
 		}
 	}
