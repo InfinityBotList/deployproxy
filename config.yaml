@@ -1,0 +1,8 @@
+deploys:
+  sl.infinitybots.gg:
+    url: "https://sl.infinitybots.gg"
+    description: Server Listing Experiment. Needs admin+
+    perms:
+      - admin
+    enabled: true
+    to: localhost:49593
