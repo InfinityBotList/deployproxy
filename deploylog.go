@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -20,6 +21,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
+
+var inDeploy = sync.Mutex{}
 
 type autoLogger struct {
 	DeployID string
@@ -76,89 +79,109 @@ func DeployRoutes(r *chi.Mux) {
 			return
 		}
 
-		// If cookie exists, check if it's valid
-		cookie, err := r.Cookie("__session")
-
-		if err != nil {
-			fmt.Println(err)
-			panic(err)
-		}
-
-		rsessBytes, err := rdb.Get(ctx, cookie.Value).Bytes()
-
-		if err != nil || len(rsessBytes) == 0 {
-			fmt.Println(err)
+		// Check for cookie named __session
+		if _, err := r.Cookie("__session"); err != nil {
+			// If cookie doesn't exist, redirect to login page
 			loginView(w, r)
 			return
-		}
+		} else {
+			// If cookie exists, check if it's valid
+			cookie, err := r.Cookie("__session")
 
-		var rsess RedisSession
+			if err != nil {
+				fmt.Println(err)
+				loginView(w, r)
+			}
 
-		err = json.Unmarshal(rsessBytes, &rsess)
+			rsessBytes, err := rdb.Get(ctx, cookie.Value).Bytes()
 
-		if err != nil {
-			panic(err)
-		}
-
-		if rsess.DeployURL != deploy.URL {
-			loginView(w, r)
-			return
-		}
-
-		if rsess.IP != r.RemoteAddr {
-			loginView(w, r)
-			return
-		}
-
-		// Check if user is in database
-		var userID string
-
-		err = pool.QueryRow(ctx, "SELECT user_id FROM users WHERE user_id = $1", rsess.UserID).Scan(&userID)
-
-		if err != nil {
-			if err == pgx.ErrNoRows {
-				w.WriteHeader(http.StatusUnauthorized)
-				w.Write([]byte("You are not a IBL user"))
+			if err != nil || len(rsessBytes) == 0 {
+				fmt.Println(err)
+				loginView(w, r)
 				return
 			}
 
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("Error checking user"))
+			var rsess RedisSession
+
+			err = json.Unmarshal(rsessBytes, &rsess)
+
+			if err != nil {
+				fmt.Println(err)
+				loginView(w, r)
+				return
+			}
+
+			if rsess.DeployURL != deploy.URL {
+				loginView(w, r)
+				return
+			}
+
+			if rsess.IP != r.RemoteAddr {
+				loginView(w, r)
+				return
+			}
+
+			// Check if user is in database
+			var userID string
+
+			err = pool.QueryRow(ctx, "SELECT user_id FROM users WHERE user_id = $1", rsess.UserID).Scan(&userID)
+
+			if err != nil {
+				if err == pgx.ErrNoRows {
+					w.WriteHeader(http.StatusUnauthorized)
+					w.Write([]byte("You are not a IBL user"))
+					return
+				}
+
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte("Error checking user"))
+				return
+			}
+
+			var owner bool
+
+			err = pool.QueryRow(ctx, "SELECT owner FROM users WHERE user_id = $1", rsess.UserID).Scan(&owner)
+
+			if err != nil {
+				if err == pgx.ErrNoRows {
+					w.WriteHeader(http.StatusUnauthorized)
+					w.Write([]byte("You are not a IBL user"))
+					return
+				}
+
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte("Error checking user"))
+				return
+			}
+
+			if !owner {
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte("Only owners can view the deploy logs"))
+				return
+			}
+
+			// Load in deploy as []string
+			currLog := rdb.Get(ctx, "deploy_log_"+deployId).Val()
+
+			if currLog == "" {
+				currLog = "[]"
+			}
+
+			var logs []string
+
+			err = json.Unmarshal([]byte(currLog), &logs)
+
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte("Error loading logs"))
+				return
+			}
+
+			w.Header().Set("Content-Type", "text/plain")
+			w.Write([]byte(
+				strings.Join(logs, "\n"),
+			))
 		}
-
-		var owner bool
-
-		err = pool.QueryRow(ctx, "SELECT owner FROM users WHERE user_id = $1", rsess.UserID).Scan(&owner)
-
-		if err != nil {
-			panic(err)
-		}
-
-		if !owner {
-			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte("Only owners can view the deploy logs"))
-			return
-		}
-
-		// Load in deploy as []string
-		currLog := rdb.Get(ctx, "deploy_log_"+deployId).Val()
-
-		if currLog == "" {
-			currLog = "[]"
-		}
-
-		var logs []string
-
-		err = json.Unmarshal([]byte(currLog), &logs)
-
-		if err != nil {
-			panic(err)
-		}
-
-		w.Header().Set("Content-Type", "text/plain")
-		w.Write([]byte(
-			strings.Join(logs, "\n"),
-		))
 	})
 
 	// Simple deploy script for handling auto-updates
@@ -180,6 +203,12 @@ func DeployRoutes(r *chi.Mux) {
 		if !ok {
 			w.WriteHeader(http.StatusNotFound)
 			w.Write([]byte("Deploy to protect not found: " + r.Host))
+			return
+		}
+
+		if deploy.Git == nil {
+			w.WriteHeader(401)
+			w.Write([]byte("This feature is currently disabled, please set the git config in config.yaml"))
 			return
 		}
 
@@ -224,15 +253,15 @@ func DeployRoutes(r *chi.Mux) {
 			return
 		}
 
-		if !strings.EqualFold(repoData.Repository.FullName, deploy.GithubRepo) {
+		if !strings.EqualFold(repoData.Repository.FullName, deploy.Git.GithubRepo) {
 			w.WriteHeader(http.StatusAccepted)
 			w.Write([]byte("This event is not for the correct repo, ignoring"))
 			return
 		}
 
-		if repoData.Ref != deploy.GithubRef {
+		if repoData.Ref != deploy.Git.GithubRef {
 			w.WriteHeader(http.StatusAccepted)
-			w.Write([]byte("This event is not for the correct ref, ignoring, got: " + repoData.Ref + " expected: " + deploy.GithubRef))
+			w.Write([]byte("This event is not for the correct ref, ignoring, got: " + repoData.Ref + " expected: " + deploy.Git.GithubRef))
 			return
 		}
 
@@ -240,6 +269,9 @@ func DeployRoutes(r *chi.Mux) {
 		deployID := uuid.New().String()
 
 		go func() {
+			inDeploy.Lock()
+			defer inDeploy.Unlock()
+
 			_, err = discord.ChannelMessageSendEmbeds(secrets.LogChannel, []*discordgo.MessageEmbed{
 				{
 					Title: "Deploying to VPS",
@@ -255,6 +287,7 @@ func DeployRoutes(r *chi.Mux) {
 							Inline: true,
 						},
 					},
+					Timestamp: time.Now().Format(time.RFC3339),
 				},
 			})
 
@@ -313,6 +346,19 @@ func DeployRoutes(r *chi.Mux) {
 				return
 			}
 
+			// Run `yarn install --dev in the folder`
+			cmd = exec.Command("yarn", "install", "--dev")
+			cmd.Dir = "deploys/" + deployID
+			cmd.Env = os.Environ()
+			cmd.Stdout = autoLogger{DeployID: deployID}
+			cmd.Stderr = autoLogger{DeployID: deployID, Error: true}
+
+			err = cmd.Run()
+
+			if err != nil {
+				addToDeployLog(deployID, "Error running yarn install --dev: "+err.Error())
+			}
+
 			// Run `yarn run build in the folder`
 			cmd = exec.Command("yarn", "run", "build")
 			cmd.Dir = "deploys/" + deployID
@@ -329,6 +375,72 @@ func DeployRoutes(r *chi.Mux) {
 				w.Write([]byte("Error running yarn build"))
 				return
 			}
+
+			// Remove deploy.Git.Path and move deploys/deployID to deploy.Git.Path
+			err = os.Rename(deploy.Git.Path, deploy.Git.Path+"-old")
+
+			if err != nil {
+				addToDeployLog(deployID, "Error moving old deploy folder: "+err.Error())
+
+				// Move back
+				os.Rename(deploy.Git.Path+"-old", deploy.Git.Path)
+
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte("Error moving old deploy folder"))
+				return
+			}
+
+			err = os.Rename("deploys/"+deployID, deploy.Git.Path)
+
+			if err != nil {
+				addToDeployLog(deployID, "Error moving new deploy folder: "+err.Error())
+
+				// Move back
+				os.RemoveAll(deploy.Git.Path)
+				os.Rename(deploy.Git.Path+"-old", deploy.Git.Path)
+
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte("Error moving new deploy folder"))
+				return
+			}
+
+			// Remove old deploy
+			os.RemoveAll(deploy.Git.Path + "-old")
+
+			addToDeployLog(deployID, "Deploy finished on: "+time.Now().Format(time.RFC3339))
+
+			_, err = discord.ChannelMessageSendEmbeds(secrets.LogChannel, []*discordgo.MessageEmbed{
+				{
+					Title: "Deploy finished",
+					Fields: []*discordgo.MessageEmbedField{
+						{
+							Name:   "Deploy ID",
+							Value:  deployID,
+							Inline: true,
+						},
+						{
+							Name:   "Log URL",
+							Value:  deploy.URL + "/__dp/logs?id=" + deployID,
+							Inline: true,
+						},
+					},
+					Timestamp: time.Now().Format(time.RFC3339),
+				},
+			})
+
+			// Run systemctl restart deploy.Git.Service
+			cmd = exec.Command("systemctl", "restart", deploy.Git.Service)
+			cmd.Env = os.Environ()
+			cmd.Stdout = autoLogger{DeployID: deployID}
+			cmd.Stderr = autoLogger{DeployID: deployID, Error: true}
+
+			err = cmd.Run()
+
+			if err != nil {
+				addToDeployLog(deployID, "Error restarting service: "+err.Error())
+			}
+
+			addToDeployLog(deployID, "Service restarted on: "+time.Now().Format(time.RFC3339))
 		}()
 
 		w.WriteHeader(http.StatusOK)

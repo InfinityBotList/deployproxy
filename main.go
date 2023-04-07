@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -126,6 +127,31 @@ func proxy(w http.ResponseWriter, r *http.Request, deploy Deploy) {
 
 	w.WriteHeader(resp.StatusCode)
 	w.Write(bodyBytes)
+}
+
+func checkPerms(userId string, perms []Perm) error {
+	for _, permNeeded := range perms {
+		switch permNeeded {
+		case PermAdmin:
+			var admin bool
+
+			err := pool.QueryRow(ctx, "SELECT admin FROM users WHERE user_id = $1", userId).Scan(&admin)
+
+			if err != nil {
+				if err == pgx.ErrNoRows {
+					return errors.New("you are not a IBL user")
+				}
+
+				return errors.New("error checking user")
+			}
+
+			if !admin {
+				return errors.New("user is not an admin")
+			}
+		}
+	}
+
+	return nil
 }
 
 func main() {
@@ -254,6 +280,20 @@ func main() {
 		http.Redirect(w, r, "https://discord.com/api/oauth2/authorize?client_id="+secrets.ClientID+"&redirect_uri="+deploy.URL+"/__dp/confirm&scope=identify&response_type=code&state="+r.URL.Query().Get("url"), http.StatusFound)
 	})
 
+	r.HandleFunc("/__dp/sesscookie", func(w http.ResponseWriter, r *http.Request) {
+		// Get session cookie
+		sessionCookie, err := r.Cookie("__session")
+
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("No session cookie provided"))
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(sessionCookie.Value))
+	})
+
 	r.HandleFunc("/__dp/confirm", func(w http.ResponseWriter, r *http.Request) {
 		if r.RemoteAddr == "" {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -297,7 +337,9 @@ func main() {
 		})
 
 		if err != nil {
-			panic(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Error sending access token request to Discord"))
+			return
 		}
 
 		if resp.StatusCode != http.StatusOK {
@@ -305,7 +347,9 @@ func main() {
 			body, err := io.ReadAll(resp.Body)
 
 			if err != nil {
-				panic(err)
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte("Error reading body from Discord"))
+				return
 			}
 
 			fmt.Println(string(body))
@@ -320,7 +364,9 @@ func main() {
 		err = json.NewDecoder(resp.Body).Decode(&token)
 
 		if err != nil {
-			panic(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Error decoding response from discord"))
+			return
 		}
 
 		// Get user from discord
@@ -331,7 +377,10 @@ func main() {
 		req, err := http.NewRequest("GET", "https://discord.com/api/v10/users/@me", nil)
 
 		if err != nil {
-			panic(err)
+			fmt.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Error creating request to Discord"))
+			return
 		}
 
 		req.Header.Set("Authorization", "Bearer "+token.AccessToken)
@@ -339,7 +388,9 @@ func main() {
 		resp, err = cli.Do(req)
 
 		if err != nil {
-			panic(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Error sending user request to Discord"))
+			return
 		}
 
 		if resp.StatusCode != http.StatusOK {
@@ -353,28 +404,22 @@ func main() {
 		err = json.NewDecoder(resp.Body).Decode(&user)
 
 		if err != nil {
-			panic(err)
+			fmt.Println(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Error decoding user from Discord"))
+			return
 		}
 
 		// Check user with postgres
-		var userID string
-
-		err = pool.QueryRow(ctx, "SELECT user_id FROM users WHERE user_id = $1", user.ID).Scan(&userID)
-
-		if err != nil {
-			if err == pgx.ErrNoRows {
-				w.WriteHeader(http.StatusUnauthorized)
-				w.Write([]byte("You are not a IBL user"))
-				return
-			}
-
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("Error checking user"))
+		if err := checkPerms(user.ID, deploy.Perms); err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte(err.Error()))
+			return
 		}
 
 		// Create a session
 		sess := RedisSession{
-			UserID:    userID,
+			UserID:    user.ID,
 			DeployURL: deploy.URL,
 			IP:        r.RemoteAddr,
 		}
@@ -382,8 +427,9 @@ func main() {
 		sessBytes, err := json.Marshal(sess)
 
 		if err != nil {
-			fmt.Println(err)
-			panic(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Error marshalling session"))
+			return
 		}
 
 		// Set session in redis
@@ -392,8 +438,9 @@ func main() {
 		err = rdb.Set(ctx, sessId, sessBytes, 2*time.Hour).Err()
 
 		if err != nil {
-			fmt.Println(err)
-			panic(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Error creating session"))
+			return
 		}
 
 		// Set cookie
@@ -434,7 +481,8 @@ func main() {
 
 			if err != nil {
 				fmt.Println(err)
-				panic(err)
+				loginView(w, r)
+				return
 			}
 
 			rsessBytes, err := rdb.Get(ctx, cookie.Value).Bytes()
@@ -450,7 +498,9 @@ func main() {
 			err = json.Unmarshal(rsessBytes, &rsess)
 
 			if err != nil {
-				panic(err)
+				fmt.Println(err)
+				loginView(w, r)
+				return
 			}
 
 			if rsess.DeployURL != deploy.URL {
@@ -477,27 +527,35 @@ func main() {
 
 				w.WriteHeader(http.StatusInternalServerError)
 				w.Write([]byte("Error checking user"))
+				return
 			}
 
-			if time.Now().Unix()-rsess.LastChecked > int64(5*time.Minute) {
+			if time.Now().Unix()-rsess.LastChecked > 300 {
 				// Check perms
-				for _, permNeeded := range deploy.Perms {
-					switch permNeeded {
-					case PermAdmin:
-						var admin bool
+				if err := checkPerms(rsess.UserID, deploy.Perms); err != nil {
+					w.WriteHeader(http.StatusUnauthorized)
+					w.Write([]byte(err.Error()))
+					return
+				}
+				rsess.LastChecked = time.Now().Unix()
 
-						err = pool.QueryRow(ctx, "SELECT admin FROM users WHERE user_id = $1", rsess.UserID).Scan(&admin)
+				sessBytes, err := json.Marshal(rsess)
 
-						if err != nil {
-							panic(err)
-						}
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					w.Write([]byte("Error marshalling session"))
+					return
+				}
 
-						if !admin {
-							w.WriteHeader(http.StatusUnauthorized)
-							w.Write([]byte("You are not an admin"))
-							return
-						}
-					}
+				// Set session in redis
+				err = rdb.SetArgs(ctx, cookie.Value, sessBytes, redis.SetArgs{
+					KeepTTL: true,
+				}).Err()
+
+				if err != nil {
+					w.WriteHeader(http.StatusInternalServerError)
+					w.Write([]byte("Error creating session"))
+					return
 				}
 			}
 

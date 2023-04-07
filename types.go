@@ -16,13 +16,19 @@ type Secrets struct {
 }
 
 type Deploy struct {
-	URL         string `yaml:"url"`
-	Description string `yaml:"description"`
-	Enabled     bool   `yaml:"enabled"`
-	Perms       []Perm `yaml:"perms"`
-	To          string `yaml:"to"`
-	GithubRepo  string `yaml:"github_repo"`
-	GithubRef   string `yaml:"github_ref"`
+	URL         string     `yaml:"url"`
+	Description string     `yaml:"description"`
+	Enabled     bool       `yaml:"enabled"`
+	Perms       []Perm     `yaml:"perms"`
+	To          string     `yaml:"to"`
+	Git         *DeployGit `yaml:"git"`
+}
+
+type DeployGit struct {
+	GithubRepo string `yaml:"github_repo"`
+	GithubRef  string `yaml:"github_ref"`
+	Path       string `yaml:"path"`
+	Service    string `yaml:"service"`
 }
 
 type LoginView struct {

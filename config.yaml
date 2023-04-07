@@ -1,8 +1,11 @@
 deploys:
   sl.infinitybots.gg:
     url: "https://sl.infinitybots.gg"
-    github_repo: "InfinityBotList/Infinity-Next"
-    github_ref: "refs/heads/priv-serverlist"
+    git:
+      github_repo: "InfinityBotList/Infinity-Next"
+      path: /root/priv-sl
+      github_ref: "refs/heads/priv-serverlist"
+      service: "priv-sl"
     description: Server Listing Experiment. Needs admin+
     perms:
       - admin
