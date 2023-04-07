@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	_ "embed"
@@ -58,6 +59,7 @@ func loginView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.WriteHeader(http.StatusUnauthorized)
 	t.Execute(w, deploy)
 }
 
@@ -74,6 +76,56 @@ func downView(w http.ResponseWriter, r *http.Request, reason string) {
 	t.Execute(w, Down{
 		Error: reason,
 	})
+}
+
+func proxy(w http.ResponseWriter, r *http.Request, deploy Deploy) {
+	// Proxy request to To
+
+	cli := &http.Client{
+		Timeout: 2 * time.Minute,
+	}
+
+	url := deploy.To + r.URL.Path
+
+	if r.URL.RawQuery != "" {
+		url += "?" + r.URL.RawQuery + "&v=21"
+	} else {
+		url += "?v=21"
+	}
+
+	req, err := http.NewRequest(r.Method, deploy.To+r.URL.Path+"?"+r.URL.RawQuery, r.Body)
+
+	if err != nil {
+		downView(w, r, "Error creating request to backend")
+		return
+	}
+
+	req.Header = r.Header
+
+	resp, err := cli.Do(req)
+
+	if err != nil {
+		downView(w, r, "Error sending request to backend")
+		return
+	}
+
+	defer resp.Body.Close()
+
+	for k, v := range resp.Header {
+		if k == "Content-Type" || k == "Content-Encoding" {
+			w.Header()[k] = v
+		}
+	}
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+
+	if err != nil {
+		downView(w, r, "Error reading response body from backend")
+		return
+	}
+
+	w.WriteHeader(resp.StatusCode)
+	w.Write(bodyBytes)
 }
 
 func main() {
@@ -172,8 +224,6 @@ func main() {
 			Name:     "__session",
 			Value:    "",
 			Expires:  time.Now().Add(-1 * time.Hour),
-			Secure:   true,
-			HttpOnly: true,
 			SameSite: http.SameSiteLaxMode,
 		})
 
@@ -322,6 +372,7 @@ func main() {
 		sessBytes, err := json.Marshal(sess)
 
 		if err != nil {
+			fmt.Println(err)
 			panic(err)
 		}
 
@@ -331,6 +382,7 @@ func main() {
 		err = rdb.Set(ctx, sessId, sessBytes, 2*time.Hour).Err()
 
 		if err != nil {
+			fmt.Println(err)
 			panic(err)
 		}
 
@@ -338,11 +390,10 @@ func main() {
 		http.SetCookie(w, &http.Cookie{
 			Name:     "__session",
 			Value:    sessId,
-			Path:     "/",
 			Expires:  time.Now().Add(2 * time.Hour),
-			Secure:   true,
-			HttpOnly: true,
 			SameSite: http.SameSiteLaxMode,
+			Secure:   true,
+			Path:     "/",
 		})
 
 		// Redirect to redirect cookie
@@ -365,6 +416,10 @@ func main() {
 			return
 		}
 
+		if strings.HasPrefix(r.URL.Path, "/_next/image") || r.URL.Path == "/favicon.ico" || r.URL.Path == "/manifest.json" || r.URL.Path == "/robots.txt" {
+			proxy(w, r, deploy)
+		}
+
 		// Check for cookie named __session
 		if _, err := r.Cookie("__session"); err != nil {
 			// If cookie doesn't exist, redirect to login page
@@ -375,6 +430,7 @@ func main() {
 			cookie, err := r.Cookie("__session")
 
 			if err != nil {
+				fmt.Println(err)
 				panic(err)
 			}
 
@@ -440,49 +496,8 @@ func main() {
 				}
 			}
 
-			// Proxy request to To
-
-			cli := &http.Client{
-				Timeout: 2 * time.Minute,
-			}
-
-			req, err := http.NewRequest(r.Method, deploy.To+r.URL.Path+"?"+r.URL.RawQuery, r.Body)
-
-			if err != nil {
-				downView(w, r, "Error creating request to backend")
-				return
-			}
-
-			req.Header = r.Header
-
-			resp, err := cli.Do(req)
-
-			if err != nil {
-				downView(w, r, "Error sending request to backend")
-				return
-			}
-
-			defer resp.Body.Close()
-
-			for k, v := range resp.Header {
-				if k == "Content-Length" || k == "Host" {
-					continue
-				}
-				w.Header()[k] = v
-			}
-
-			bodyBytes, err := io.ReadAll(resp.Body)
-
-			if err != nil {
-				downView(w, r, "Error reading response body from backend")
-				return
-			}
-
-			w.WriteHeader(resp.StatusCode)
-			w.Write(bodyBytes)
+			proxy(w, r, deploy)
 		}
-
-		w.Write([]byte("Hello, World!"))
 	})
 
 	// Create server

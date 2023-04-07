@@ -5,4 +5,4 @@ deploys:
     perms:
       - admin
     enabled: true
-    to: localhost:49593
+    to: http://localhost:30008
