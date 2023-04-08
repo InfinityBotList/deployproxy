@@ -33,3 +33,6 @@ deploys:
         - "Content-Type"
         - "Authorization"
         - "X-Client"
+      bypass:
+        ends_with:
+          - /seo

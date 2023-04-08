@@ -33,8 +33,13 @@ type DeployGit struct {
 }
 
 type DeployAPI struct {
-	CorrespondingDeploy string   `yaml:"corresponding_deploy"`
-	AllowHeaders        []string `yaml:"allow_headers"`
+	CorrespondingDeploy string        `yaml:"corresponding_deploy"`
+	AllowHeaders        []string      `yaml:"allow_headers"`
+	Bypass              *DeployBypass `yaml:"bypass"`
+}
+
+type DeployBypass struct {
+	EndsWith []string `yaml:"ends_with"`
 }
 
 type LoginView struct {

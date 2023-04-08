@@ -590,6 +590,16 @@ func main() {
 				return
 			}
 
+			// Check if in bypass
+			if deploy.API.Bypass != nil {
+				for _, bypass := range deploy.API.Bypass.EndsWith {
+					if strings.HasSuffix(r.URL.Path, bypass) {
+						proxy(w, r, deploy)
+						return
+					}
+				}
+			}
+
 			// Check for external cookie
 			if cookie, err := r.Cookie(extCookieName); err == nil {
 				// Get session id from redis
