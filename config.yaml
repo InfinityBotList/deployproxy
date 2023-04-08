@@ -1,13 +1,35 @@
 deploys:
+  # The hostname
   sl.infinitybots.gg:
+    # The URL with protocol
     url: "https://sl.infinitybots.gg"
+    # Git settings
     git:
+      # The repo fullname. Format: username/repo
       github_repo: "InfinityBotList/Infinity-Next"
+      # The folder of the service
       path: /root/priv-sl
+      # The ref to check+pull
       github_ref: "refs/heads/priv-serverlist"
+      # The service name in systemd
       service: "priv-sl"
+    # The service description
     description: Server Listing Experiment. Needs admin+
+    # The permissions needed for the service
     perms:
       - admin
+    # Whether the service is enabled for viewing
     enabled: true
+    # The host to proxy to
     to: http://localhost:30008
+  sl-api.infinitybots.gg:
+    url: "https://sl-api.infinitybots.gg"
+    description: Server Listing Experiment API
+    enabled: true
+    to: http://localhost:30009
+    api:
+      corresponding_deploy: "sl.infinitybots.gg"
+      allow_headers:
+        - "Content-Type"
+        - "Authorization"
+        - "X-Client"

@@ -22,6 +22,7 @@ type Deploy struct {
 	Perms       []Perm     `yaml:"perms"`
 	To          string     `yaml:"to"`
 	Git         *DeployGit `yaml:"git"`
+	API         *DeployAPI `yaml:"api"`
 }
 
 type DeployGit struct {
@@ -29,6 +30,11 @@ type DeployGit struct {
 	GithubRef  string `yaml:"github_ref"`
 	Path       string `yaml:"path"`
 	Service    string `yaml:"service"`
+}
+
+type DeployAPI struct {
+	CorrespondingDeploy string   `yaml:"corresponding_deploy"`
+	AllowHeaders        []string `yaml:"allow_headers"`
 }
 
 type LoginView struct {

@@ -17,6 +17,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	githttp "github.com/go-git/go-git/v5/plumbing/transport/http"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -79,14 +80,14 @@ func DeployRoutes(r *chi.Mux) {
 			return
 		}
 
-		// Check for cookie named __session
-		if _, err := r.Cookie("__session"); err != nil {
+		// Check for cookie named sessCookieName
+		if _, err := r.Cookie(sessCookieName); err != nil {
 			// If cookie doesn't exist, redirect to login page
 			loginView(w, r)
 			return
 		} else {
 			// If cookie exists, check if it's valid
-			cookie, err := r.Cookie("__session")
+			cookie, err := r.Cookie(sessCookieName)
 
 			if err != nil {
 				fmt.Println(err)
@@ -318,7 +319,8 @@ func DeployRoutes(r *chi.Mux) {
 					Username: secrets.GithubPat,
 					Password: secrets.GithubPat,
 				},
-				Progress: autoLogger{DeployID: deployID},
+				Progress:      autoLogger{DeployID: deployID},
+				ReferenceName: plumbing.ReferenceName(deploy.Git.GithubRef),
 			})
 
 			if err != nil {
