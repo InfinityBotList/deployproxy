@@ -693,7 +693,7 @@ func main() {
 					}
 
 					// Set session in redis
-					err = rdb.SetArgs(ctx, cookie.Value, sessBytes, redis.SetArgs{
+					err = rdb.SetArgs(ctx, sessId, sessBytes, redis.SetArgs{
 						KeepTTL: true,
 					}).Err()
 
