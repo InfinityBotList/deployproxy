@@ -34,12 +34,6 @@ var (
 	discord *discordgo.Session
 )
 
-//go:embed login.html
-var loginHTML string
-
-//go:embed down.html
-var downHTML string
-
 func loginView(w http.ResponseWriter, r *http.Request) {
 	deploy, ok := config.Deploys[r.Host]
 
@@ -226,6 +220,12 @@ func main() {
 
 	// For github etc.
 	DeployRoutes(r)
+
+	// Serve common CSS
+	r.HandleFunc("/__dp/common-css", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/css")
+		w.Write([]byte(commonCSS))
+	})
 
 	r.HandleFunc("/__dp/logout", func(w http.ResponseWriter, r *http.Request) {
 		// Get session cookie
