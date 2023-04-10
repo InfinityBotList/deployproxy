@@ -16,26 +16,29 @@ type Secrets struct {
 }
 
 type Deploy struct {
-	URL         string     `yaml:"url"`
-	Description string     `yaml:"description"`
-	Enabled     bool       `yaml:"enabled"`
-	Perms       []Perm     `yaml:"perms"`
-	To          string     `yaml:"to"`
-	Git         *DeployGit `yaml:"git"`
-	API         *DeployAPI `yaml:"api"`
+	URL         string        `yaml:"url"`
+	Description string        `yaml:"description"`
+	Enabled     bool          `yaml:"enabled"`
+	Perms       []Perm        `yaml:"perms"`
+	AllowedIDS  []string      `yaml:"allowed_ids"`
+	To          string        `yaml:"to"`
+	Git         *DeployGit    `yaml:"git"`
+	API         *DeployAPI    `yaml:"api"`
+	Bypass      *DeployBypass `yaml:"bypass"`
+	Strict      bool          `yaml:"strict"`
 }
 
 type DeployGit struct {
-	GithubRepo string `yaml:"github_repo"`
-	GithubRef  string `yaml:"github_ref"`
-	Path       string `yaml:"path"`
-	Service    string `yaml:"service"`
+	GithubRepo    string   `yaml:"github_repo"`
+	GithubRef     string   `yaml:"github_ref"`
+	Path          string   `yaml:"path"`
+	Service       string   `yaml:"service"`
+	BuildCommands []string `yaml:"build_commands"`
 }
 
 type DeployAPI struct {
-	CorrespondingDeploy string        `yaml:"corresponding_deploy"`
-	AllowHeaders        []string      `yaml:"allow_headers"`
-	Bypass              *DeployBypass `yaml:"bypass"`
+	CorrespondingDeploy string   `yaml:"corresponding_deploy"`
+	AllowHeaders        []string `yaml:"allow_headers"`
 }
 
 type DeployBypass struct {

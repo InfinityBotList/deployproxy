@@ -331,51 +331,26 @@ func DeployRoutes(r *chi.Mux) {
 				return
 			}
 
-			// Run `yarn run install in the folder`
-			cmd := exec.Command("yarn", "install")
-			cmd.Dir = "deploys/" + deployID
-			cmd.Env = os.Environ()
-			cmd.Stdout = autoLogger{DeployID: deployID}
-			cmd.Stderr = autoLogger{DeployID: deployID, Error: true}
+			for _, command := range deploy.Git.BuildCommands {
+				// Split cmd into args
+				args := strings.Split(command, " ")
 
-			err = cmd.Run()
+				// Run the command
+				cmd := exec.Command(args[0], args[1:]...)
+				cmd.Dir = "deploys/" + deployID
+				cmd.Env = os.Environ()
+				cmd.Stdout = autoLogger{DeployID: deployID}
+				cmd.Stderr = autoLogger{DeployID: deployID, Error: true}
 
-			if err != nil {
-				addToDeployLog(deployID, "Error running yarn install: "+err.Error())
+				err = cmd.Run()
 
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte("Error running yarn install"))
-				return
-			}
+				if err != nil {
+					addToDeployLog(deployID, "Error running build command: "+err.Error())
 
-			// Run `yarn install --dev in the folder`
-			cmd = exec.Command("yarn", "install", "--dev")
-			cmd.Dir = "deploys/" + deployID
-			cmd.Env = os.Environ()
-			cmd.Stdout = autoLogger{DeployID: deployID}
-			cmd.Stderr = autoLogger{DeployID: deployID, Error: true}
-
-			err = cmd.Run()
-
-			if err != nil {
-				addToDeployLog(deployID, "Error running yarn install --dev: "+err.Error())
-			}
-
-			// Run `yarn run build in the folder`
-			cmd = exec.Command("yarn", "run", "build")
-			cmd.Dir = "deploys/" + deployID
-			cmd.Env = os.Environ()
-			cmd.Stdout = autoLogger{DeployID: deployID}
-			cmd.Stderr = autoLogger{DeployID: deployID, Error: true}
-
-			err = cmd.Run()
-
-			if err != nil {
-				addToDeployLog(deployID, "Error running yarn build: "+err.Error())
-
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte("Error running yarn build"))
-				return
+					w.WriteHeader(http.StatusInternalServerError)
+					w.Write([]byte("Error running build command:" + command))
+					return
+				}
 			}
 
 			// Remove deploy.Git.Path and move deploys/deployID to deploy.Git.Path
@@ -431,7 +406,7 @@ func DeployRoutes(r *chi.Mux) {
 			})
 
 			// Run systemctl restart deploy.Git.Service
-			cmd = exec.Command("systemctl", "restart", deploy.Git.Service)
+			cmd := exec.Command("systemctl", "restart", deploy.Git.Service)
 			cmd.Env = os.Environ()
 			cmd.Stdout = autoLogger{DeployID: deployID}
 			cmd.Stderr = autoLogger{DeployID: deployID, Error: true}

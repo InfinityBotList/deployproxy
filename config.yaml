@@ -13,6 +13,11 @@ deploys:
       github_ref: "refs/heads/priv-serverlist"
       # The service name in systemd
       service: "priv-sl"
+      # Build commands
+      build_commands:
+        - "yarn run install"
+        - "yarn install --dev"
+        - "yarn run build"
     # The service description
     description: Server Listing Experiment. Needs admin+
     # The permissions needed for the service
@@ -27,12 +32,21 @@ deploys:
     description: Server Listing Experiment API
     enabled: true
     to: http://localhost:30009
+    bypass:
+      ends_with:
+        - /seo
     api:
       corresponding_deploy: "sl.infinitybots.gg"
       allow_headers:
         - "Content-Type"
         - "Authorization"
         - "X-Client"
-      bypass:
-        ends_with:
-          - /seo
+  sysmanage.infinitybots.gg:
+    url: "https://sysmanage.infinitybots.gg"
+    description: System Management
+    enabled: true
+    to: http://localhost:30010
+    allowed_ids:
+      - 510065483693817867
+      - 728871946456137770
+    strict: true # Strict means that bypasses are not allowed

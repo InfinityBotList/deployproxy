@@ -188,8 +188,14 @@ func proxy(w http.ResponseWriter, r *http.Request, deploy Deploy, userId string)
 	w.Write(bodyBytes)
 }
 
-func checkPerms(userId string, perms []Perm) error {
-	for _, permNeeded := range perms {
+func checkPerms(userId string, deploy Deploy) error {
+	if len(deploy.AllowedIDS) > 0 {
+		if !slices.Contains(deploy.AllowedIDS, userId) {
+			return errors.New("user not in allowed list")
+		}
+	}
+
+	for _, permNeeded := range deploy.Perms {
 		switch permNeeded {
 		case PermAdmin:
 			var admin bool
@@ -487,7 +493,7 @@ func main() {
 		}
 
 		// Check user with postgres
-		if err := checkPerms(user.ID, deploy.Perms); err != nil {
+		if err := checkPerms(user.ID, deploy); err != nil {
 			w.WriteHeader(http.StatusUnauthorized)
 			w.Write([]byte(err.Error()))
 			return
@@ -589,14 +595,14 @@ func main() {
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE")
 
 			// OPTIONS requests are unauthenticated/we dont care
-			if r.Method == "OPTIONS" {
+			if !deploy.Strict && r.Method == "OPTIONS" {
 				proxy(w, r, deploy, "")
 				return
 			}
 
 			// Check if in bypass
-			if deploy.API.Bypass != nil {
-				for _, bypass := range deploy.API.Bypass.EndsWith {
+			if !deploy.Strict && deploy.Bypass != nil {
+				for _, bypass := range deploy.Bypass.EndsWith {
 					if strings.HasSuffix(r.URL.Path, bypass) {
 						proxy(w, r, deploy, "")
 						return
@@ -665,7 +671,7 @@ func main() {
 
 				if time.Now().Unix()-rsess.LastChecked > expiryTime {
 					// Check perms
-					if err := checkPerms(rsess.UserID, correspondingDeploy.Perms); err != nil {
+					if err := checkPerms(rsess.UserID, correspondingDeploy); err != nil {
 						w.WriteHeader(http.StatusUnauthorized)
 						var errStruct struct {
 							Message string `json:"message"`
@@ -717,7 +723,7 @@ func main() {
 			}
 		}
 
-		if strings.HasPrefix(r.URL.Path, "/_next/image") || r.URL.Path == "/favicon.ico" || r.URL.Path == "/manifest.json" || r.URL.Path == "/robots.txt" {
+		if !deploy.Strict && (strings.HasPrefix(r.URL.Path, "/_next/image") || r.URL.Path == "/favicon.ico" || r.URL.Path == "/manifest.json" || r.URL.Path == "/robots.txt") {
 			proxy(w, r, deploy, "")
 		}
 
@@ -789,7 +795,7 @@ func main() {
 
 			if time.Now().Unix()-rsess.LastChecked > expiryTime {
 				// Check perms
-				if err := checkPerms(rsess.UserID, deploy.Perms); err != nil {
+				if err := checkPerms(rsess.UserID, deploy); err != nil {
 					w.WriteHeader(http.StatusUnauthorized)
 					w.Write([]byte(err.Error()))
 					return
