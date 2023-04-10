@@ -80,7 +80,7 @@ func downView(w http.ResponseWriter, r *http.Request, reason string) {
 	})
 }
 
-func proxy(w http.ResponseWriter, r *http.Request, deploy Deploy) {
+func proxy(w http.ResponseWriter, r *http.Request, deploy Deploy, userId string) {
 	var allowedHeaders = []string{
 		"Content-Type",
 		"Content-Encoding",
@@ -157,6 +157,10 @@ func proxy(w http.ResponseWriter, r *http.Request, deploy Deploy) {
 	}
 
 	req.Header = r.Header
+
+	if userId != "" {
+		req.Header.Set("X-DP-UserID", userId)
+	}
 
 	resp, err := cli.Do(req)
 
@@ -586,7 +590,7 @@ func main() {
 
 			// OPTIONS requests are unauthenticated/we dont care
 			if r.Method == "OPTIONS" {
-				proxy(w, r, deploy)
+				proxy(w, r, deploy, "")
 				return
 			}
 
@@ -594,7 +598,7 @@ func main() {
 			if deploy.API.Bypass != nil {
 				for _, bypass := range deploy.API.Bypass.EndsWith {
 					if strings.HasSuffix(r.URL.Path, bypass) {
-						proxy(w, r, deploy)
+						proxy(w, r, deploy, "")
 						return
 					}
 				}
@@ -704,7 +708,7 @@ func main() {
 					}
 				}
 
-				proxy(w, r, deploy)
+				proxy(w, r, deploy, rsess.UserID)
 				return
 			} else {
 				w.WriteHeader(http.StatusUnauthorized)
@@ -714,7 +718,7 @@ func main() {
 		}
 
 		if strings.HasPrefix(r.URL.Path, "/_next/image") || r.URL.Path == "/favicon.ico" || r.URL.Path == "/manifest.json" || r.URL.Path == "/robots.txt" {
-			proxy(w, r, deploy)
+			proxy(w, r, deploy, "")
 		}
 
 		// Check for cookie named __dpsession
@@ -812,7 +816,7 @@ func main() {
 				}
 			}
 
-			proxy(w, r, deploy)
+			proxy(w, r, deploy, rsess.UserID)
 		}
 	})
 
