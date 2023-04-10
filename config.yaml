@@ -15,7 +15,7 @@ deploys:
       service: "priv-sl"
       # Build commands
       build_commands:
-        - "yarn run install"
+        - "yarn install"
         - "yarn install --dev"
         - "yarn run build"
     # The service description
