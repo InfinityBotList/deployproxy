@@ -53,3 +53,7 @@ deploys:
     bypass:
       starts_with:
         - /__external__/
+  
+perms:
+  owner: "SELECT owner FROM users WHERE user_id = $1"
+  admin: "SELECT admin FROM users WHERE user_id = $1"

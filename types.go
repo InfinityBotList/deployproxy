@@ -2,6 +2,9 @@ package main
 
 type Config struct {
 	Deploys map[string]Deploy `yaml:"deploys"`
+
+	// Maps a perm to a SQL statement taking a user id and returning a boolean column
+	Perms map[string]string `yaml:"perms"`
 }
 
 type Secrets struct {
@@ -20,7 +23,7 @@ type Deploy struct {
 	URL         string        `yaml:"url"`
 	Description string        `yaml:"description"`
 	Enabled     bool          `yaml:"enabled"`
-	Perms       []Perm        `yaml:"perms"`
+	Perms       []string      `yaml:"perms"`
 	AllowedIDS  []string      `yaml:"allowed_ids"`
 	To          string        `yaml:"to"`
 	Git         *DeployGit    `yaml:"git"`
@@ -53,17 +56,10 @@ type LoginView struct {
 }
 
 type RedisSession struct {
-	UserID      string `json:"user_id"`
-	DeployURL   string `json:"deploy_url"`
-	IP          string `json:"ip"`
-	LastChecked int64  `json:"last_checked"`
+	UserID    string `json:"user_id"`
+	DeployURL string `json:"deploy_url"`
+	IP        string `json:"ip"`
 }
-
-type Perm = string
-
-const (
-	PermAdmin = "admin"
-)
 
 type Down struct {
 	Error string

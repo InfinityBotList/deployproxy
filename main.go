@@ -214,23 +214,26 @@ func checkPerms(userId string, deploy Deploy) error {
 	}
 
 	for _, permNeeded := range deploy.Perms {
-		switch permNeeded {
-		case PermAdmin:
-			var admin bool
+		permSql, ok := config.Perms[permNeeded]
 
-			err := pool.QueryRow(ctx, "SELECT admin FROM users WHERE user_id = $1", userId).Scan(&admin)
+		if !ok {
+			return errors.New("unknown permission: " + permNeeded)
+		}
 
-			if err != nil {
-				if err == pgx.ErrNoRows {
-					return errors.New("you are not a IBL user")
-				}
+		var hasPerm bool
 
-				return errors.New("error checking user")
+		err := pool.QueryRow(ctx, permSql, userId).Scan(&hasPerm)
+
+		if err != nil {
+			if err == pgx.ErrNoRows {
+				return errors.New("no rows returned")
 			}
 
-			if !admin {
-				return errors.New("user is not an admin")
-			}
+			return errors.New("error checking permission: " + permNeeded)
+		}
+
+		if !hasPerm {
+			return errors.New("user does not have permission: " + permNeeded)
 		}
 	}
 
@@ -677,66 +680,27 @@ func main() {
 					return
 				}
 
-				// Check if user is in database
-				var userID string
+				// Check perms
+				if err := checkPerms(rsess.UserID, correspondingDeploy); err != nil {
+					w.WriteHeader(http.StatusUnauthorized)
+					var errStruct struct {
+						Message string `json:"message"`
+						Error   bool   `json:"error"`
+					}
 
-				err = pool.QueryRow(ctx, "SELECT user_id FROM users WHERE user_id = $1", rsess.UserID).Scan(&userID)
+					errStruct.Message = err.Error()
+					errStruct.Error = true
 
-				if err != nil {
-					if err == pgx.ErrNoRows {
-						w.WriteHeader(http.StatusUnauthorized)
-						w.Write([]byte("{\"message\":\"deployproxy: failed to find user\",\"error\":true}"))
+					errBytes, err := json.Marshal(errStruct)
+
+					if err != nil {
+						w.WriteHeader(http.StatusInternalServerError)
+						w.Write([]byte("{\"message\":\"deployproxy: failed to check perms\",\"error\":true}"))
 						return
 					}
 
-					w.WriteHeader(http.StatusInternalServerError)
-					w.Write([]byte("{\"message\":\"deployproxy: error checking if user exists\",\"error\":true}"))
+					w.Write(errBytes)
 					return
-				}
-
-				if time.Now().Unix()-rsess.LastChecked > expiryTime {
-					// Check perms
-					if err := checkPerms(rsess.UserID, correspondingDeploy); err != nil {
-						w.WriteHeader(http.StatusUnauthorized)
-						var errStruct struct {
-							Message string `json:"message"`
-							Error   bool   `json:"error"`
-						}
-
-						errStruct.Message = err.Error()
-						errStruct.Error = true
-
-						errBytes, err := json.Marshal(errStruct)
-
-						if err != nil {
-							w.WriteHeader(http.StatusInternalServerError)
-							w.Write([]byte("{\"message\":\"deployproxy: failed to check perms\",\"error\":true}"))
-							return
-						}
-
-						w.Write(errBytes)
-						return
-					}
-					rsess.LastChecked = time.Now().Unix()
-
-					sessBytes, err := json.Marshal(rsess)
-
-					if err != nil {
-						w.WriteHeader(http.StatusInternalServerError)
-						w.Write([]byte("{\"message\":\"deployproxy: failed to marshal session\",\"error\":true}}"))
-						return
-					}
-
-					// Set session in redis
-					err = rdb.SetArgs(ctx, sessId, sessBytes, redis.SetArgs{
-						KeepTTL: true,
-					}).Err()
-
-					if err != nil {
-						w.WriteHeader(http.StatusInternalServerError)
-						w.Write([]byte("{\"message\":\"deployproxy: failed to set session in redis\",\"error\":true}"))
-						return
-					}
 				}
 
 				proxy(w, r, deploy, rsess.UserID)
@@ -801,50 +765,11 @@ func main() {
 				return
 			}
 
-			// Check if user is in database
-			var userID string
-
-			err = pool.QueryRow(ctx, "SELECT user_id FROM users WHERE user_id = $1", rsess.UserID).Scan(&userID)
-
-			if err != nil {
-				if err == pgx.ErrNoRows {
-					w.WriteHeader(http.StatusUnauthorized)
-					w.Write([]byte("You are not a IBL user"))
-					return
-				}
-
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte("Error checking user"))
+			// Check perms
+			if err := checkPerms(rsess.UserID, deploy); err != nil {
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte(err.Error()))
 				return
-			}
-
-			if time.Now().Unix()-rsess.LastChecked > expiryTime {
-				// Check perms
-				if err := checkPerms(rsess.UserID, deploy); err != nil {
-					w.WriteHeader(http.StatusUnauthorized)
-					w.Write([]byte(err.Error()))
-					return
-				}
-				rsess.LastChecked = time.Now().Unix()
-
-				sessBytes, err := json.Marshal(rsess)
-
-				if err != nil {
-					w.WriteHeader(http.StatusInternalServerError)
-					w.Write([]byte("Error marshalling session"))
-					return
-				}
-
-				// Set session in redis
-				err = rdb.SetArgs(ctx, cookie.Value, sessBytes, redis.SetArgs{
-					KeepTTL: true,
-				}).Err()
-
-				if err != nil {
-					w.WriteHeader(http.StatusInternalServerError)
-					w.Write([]byte("Error creating session"))
-					return
-				}
 			}
 
 			proxy(w, r, deploy, rsess.UserID)
