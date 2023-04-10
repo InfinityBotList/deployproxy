@@ -13,6 +13,7 @@ type Secrets struct {
 	GithubPat        string `yaml:"github_pat"`
 	BotToken         string `yaml:"bot_token"`
 	LogChannel       string `yaml:"log_channel"`
+	DPSecret         string `yaml:"dp_secret"`
 }
 
 type Deploy struct {

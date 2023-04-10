@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha512"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -161,6 +165,20 @@ func proxy(w http.ResponseWriter, r *http.Request, deploy Deploy, userId string)
 	if userId != "" {
 		req.Header.Set("X-DP-UserID", userId)
 	}
+
+	// Create a hmac hash of the DPSecret
+	t := time.Now().UnixMicro()
+	h := hmac.New(sha512.New, []byte(secrets.DPSecret))
+	h.Write([]byte(strconv.Itoa(int(t))))
+
+	if userId != "" {
+		h.Write([]byte(userId))
+	}
+
+	hash := hex.EncodeToString(h.Sum(nil))
+
+	req.Header.Set("X-DP-Secret", hash)
+	req.Header.Set("X-DP-Timestamp", strconv.Itoa(int(t)))
 
 	resp, err := cli.Do(req)
 

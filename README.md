@@ -13,6 +13,7 @@ database_url: # Must be a postgres db
 redis_url: # Must be a redis db
 bot_token: # Bot token of the logging/security bot
 log_channel: # The channel to log to
+dp_secret: # The secret to send as "X-DP-Secret" for further authentication by other services
 ```
 
 For github, also set ``github_webhook_sig`` and  ``github_pat``
