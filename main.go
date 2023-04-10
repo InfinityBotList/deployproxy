@@ -167,7 +167,7 @@ func proxy(w http.ResponseWriter, r *http.Request, deploy Deploy, userId string)
 	}
 
 	// Create a hmac hash of the DPSecret
-	t := time.Now().UnixMicro()
+	t := time.Now().Unix()
 	h := hmac.New(sha512.New, []byte(secrets.DPSecret))
 	h.Write([]byte(strconv.Itoa(int(t))))
 
@@ -177,7 +177,7 @@ func proxy(w http.ResponseWriter, r *http.Request, deploy Deploy, userId string)
 
 	hash := hex.EncodeToString(h.Sum(nil))
 
-	req.Header.Set("X-DP-Secret", hash)
+	req.Header.Set("X-DP-Signature", hash)
 	req.Header.Set("X-DP-Timestamp", strconv.Itoa(int(t)))
 
 	resp, err := cli.Do(req)
