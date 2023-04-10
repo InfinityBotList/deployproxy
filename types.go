@@ -53,6 +53,7 @@ type DeployBypass struct {
 type LoginView struct {
 	Deploy     Deploy
 	CurrentURL string
+	Redirect   string
 }
 
 type RedisSession struct {

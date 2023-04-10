@@ -62,10 +62,20 @@ func loginView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Hex encode url
+	url := r.URL.Path
+
+	if r.URL.RawQuery != "" {
+		url += "?" + r.URL.RawQuery
+	}
+
+	hexed := hex.EncodeToString([]byte(url))
+
 	w.WriteHeader(http.StatusUnauthorized)
 	t.Execute(w, LoginView{
 		Deploy:     deploy,
-		CurrentURL: r.URL.Path,
+		CurrentURL: url,
+		Redirect:   hexed,
 	})
 }
 
@@ -117,7 +127,7 @@ func proxy(w http.ResponseWriter, r *http.Request, deploy Deploy, userId string)
 			url += "?" + r.URL.RawQuery
 		}
 
-		req, err := http.NewRequest(r.Method, deploy.To+r.URL.Path+"?"+r.URL.RawQuery, nil)
+		req, err := http.NewRequest(r.Method, url, nil)
 
 		if err != nil {
 			downView(w, r, "Error creating request to backend")
@@ -134,7 +144,7 @@ func proxy(w http.ResponseWriter, r *http.Request, deploy Deploy, userId string)
 		}
 
 		for k, v := range resp.Header {
-			if slices.Contains(allowedHeaders, k) {
+			if strings.HasPrefix("X-", k) || slices.Contains(allowedHeaders, k) {
 				w.Header()[k] = v
 			}
 		}
@@ -153,7 +163,7 @@ func proxy(w http.ResponseWriter, r *http.Request, deploy Deploy, userId string)
 		url += "?" + r.URL.RawQuery
 	}
 
-	req, err := http.NewRequest(r.Method, deploy.To+r.URL.Path+"?"+r.URL.RawQuery, r.Body)
+	req, err := http.NewRequest(r.Method, url, r.Body)
 
 	if err != nil {
 		downView(w, r, "Error creating request to backend")
@@ -190,7 +200,7 @@ func proxy(w http.ResponseWriter, r *http.Request, deploy Deploy, userId string)
 	defer resp.Body.Close()
 
 	for k, v := range resp.Header {
-		if slices.Contains(allowedHeaders, k) {
+		if strings.HasPrefix(k, "X-") || slices.Contains(allowedHeaders, k) {
 			w.Header()[k] = v
 		}
 	}
@@ -587,8 +597,21 @@ func main() {
 			Path:     "/",
 		})
 
+		state := r.URL.Query().Get("state")
+
+		// Try to hexdecode state if not empty
+		url := ""
+
+		if state != "" {
+			urlBytes, err := hex.DecodeString(state)
+
+			if err == nil {
+				url = string(urlBytes)
+			}
+		}
+
 		// Redirect to state
-		http.Redirect(w, r, deploy.URL+r.URL.Query().Get("state"), http.StatusFound)
+		http.Redirect(w, r, deploy.URL+url, http.StatusFound)
 	})
 
 	r.HandleFunc("/*", func(w http.ResponseWriter, r *http.Request) {
