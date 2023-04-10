@@ -597,6 +597,23 @@ func main() {
 			return
 		}
 
+		// Check if in bypass
+		if deploy.Bypass != nil {
+			for _, bypass := range deploy.Bypass.EndsWith {
+				if strings.HasSuffix(r.URL.Path, bypass) {
+					proxy(w, r, deploy, "")
+					return
+				}
+			}
+
+			for _, bypass := range deploy.Bypass.StartsWith {
+				if strings.HasPrefix(r.URL.Path, bypass) {
+					proxy(w, r, deploy, "")
+					return
+				}
+			}
+		}
+
 		if deploy.API != nil {
 			// Get corresponding deploy
 			correspondingDeploy, ok := config.Deploys[deploy.API.CorrespondingDeploy]
@@ -616,16 +633,6 @@ func main() {
 			if !deploy.Strict && r.Method == "OPTIONS" {
 				proxy(w, r, deploy, "")
 				return
-			}
-
-			// Check if in bypass
-			if !deploy.Strict && deploy.Bypass != nil {
-				for _, bypass := range deploy.Bypass.EndsWith {
-					if strings.HasSuffix(r.URL.Path, bypass) {
-						proxy(w, r, deploy, "")
-						return
-					}
-				}
 			}
 
 			// Check for external cookie

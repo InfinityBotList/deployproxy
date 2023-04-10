@@ -306,9 +306,6 @@ func DeployRoutes(r *chi.Mux) {
 
 			if err != nil {
 				addToDeployLog(deployID, "Error creating deploy folder: "+err.Error())
-
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte("Error creating deploy folder"))
 				return
 			}
 
@@ -325,9 +322,6 @@ func DeployRoutes(r *chi.Mux) {
 
 			if err != nil {
 				addToDeployLog(deployID, "Error cloning repo: "+err.Error())
-
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte("Error cloning repo"))
 				return
 			}
 
@@ -346,9 +340,6 @@ func DeployRoutes(r *chi.Mux) {
 
 				if err != nil {
 					addToDeployLog(deployID, "Error running build command: "+err.Error())
-
-					w.WriteHeader(http.StatusInternalServerError)
-					w.Write([]byte("Error running build command:" + command))
 					return
 				}
 			}
@@ -361,9 +352,6 @@ func DeployRoutes(r *chi.Mux) {
 
 				// Move back
 				os.Rename(deploy.Git.Path+"-old", deploy.Git.Path)
-
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte("Error moving old deploy folder"))
 				return
 			}
 
@@ -375,9 +363,6 @@ func DeployRoutes(r *chi.Mux) {
 				// Move back
 				os.RemoveAll(deploy.Git.Path)
 				os.Rename(deploy.Git.Path+"-old", deploy.Git.Path)
-
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte("Error moving new deploy folder"))
 				return
 			}
 

@@ -43,7 +43,8 @@ type DeployAPI struct {
 }
 
 type DeployBypass struct {
-	EndsWith []string `yaml:"ends_with"`
+	StartsWith []string `yaml:"starts_with"`
+	EndsWith   []string `yaml:"ends_with"`
 }
 
 type LoginView struct {

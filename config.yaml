@@ -50,3 +50,6 @@ deploys:
       - 510065483693817867
       - 728871946456137770
     strict: true # Strict means that bypasses are not allowed
+    bypass:
+      starts_with:
+        - /__external__/
