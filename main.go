@@ -373,7 +373,7 @@ func main() {
 			Expires:  time.Now().Add(-1 * time.Hour),
 			SameSite: http.SameSiteNoneMode, // We want them to be sent to APIs etc
 			Secure:   true,
-			HttpOnly: true,
+			HttpOnly: false,
 		})
 
 		w.WriteHeader(http.StatusOK)
