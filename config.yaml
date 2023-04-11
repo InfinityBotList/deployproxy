@@ -49,7 +49,7 @@ deploys:
     allowed_ids:
       - 510065483693817867
       - 728871946456137770
-    strict: true # Strict means that bypasses are not allowed
+    strict: true # Strict means that the permissive allowlist is ignored
     bypass:
       starts_with:
         - /__external__/
