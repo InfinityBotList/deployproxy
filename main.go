@@ -110,6 +110,7 @@ func proxy(w http.ResponseWriter, r *http.Request, deploy Deploy, userId string)
 		"Accept",
 		"Accept-Encoding",
 		"Accept-Language",
+		"Location",
 	}
 
 	// Proxy request to To
@@ -155,6 +156,9 @@ func proxy(w http.ResponseWriter, r *http.Request, deploy Deploy, userId string)
 
 	cli := &http.Client{
 		Timeout: 2 * time.Minute,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
 	}
 
 	url := deploy.To + r.URL.Path
