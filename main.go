@@ -21,7 +21,6 @@ import (
 	"golang.org/x/exp/slices"
 	"gopkg.in/yaml.v3"
 
-	"github.com/bwmarrin/discordgo"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/infinitybotlist/eureka/crypto"
@@ -36,7 +35,6 @@ var (
 	pool    *pgxpool.Pool
 	ctx     = context.Background()
 	rdb     *redis.Client
-	discord *discordgo.Session
 )
 
 const (
@@ -193,6 +191,7 @@ func proxy(w http.ResponseWriter, r *http.Request, deploy Deploy, userId string)
 
 	req.Header.Set("X-DP-Signature", hash)
 	req.Header.Set("X-DP-Timestamp", strconv.Itoa(int(t)))
+	req.Header.Set("X-DP-Host", deploy.URL)
 
 	resp, err := cli.Do(req)
 
@@ -305,13 +304,6 @@ func main() {
 
 	rdb = redis.NewClient(rOptions)
 
-	// Connect to discord, no intents though
-	discord, err = discordgo.New("Bot " + secrets.BotToken)
-
-	if err != nil {
-		panic(err)
-	}
-
 	// Create wildcard route
 	r := chi.NewRouter()
 
@@ -323,9 +315,6 @@ func main() {
 		middleware.Logger,
 		middleware.Timeout(30*time.Second),
 	)
-
-	// For github etc.
-	DeployRoutes(r)
 
 	// Serve common CSS
 	r.HandleFunc("/__dp/common-css", func(w http.ResponseWriter, r *http.Request) {
