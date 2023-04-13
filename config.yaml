@@ -50,6 +50,15 @@ deploys:
       - 510065483693817867
       - 728871946456137770
     strict: true # Strict means that the permissive allowlist is ignored
+  helpernode-metro.infinitybots.gg:
+    url: "https://helpernode-metro.infinitybots.gg"
+    description: Metro Helper Node System Management
+    enabled: true
+    to: http://100.104.199.117:30010
+    allowed_ids:
+      - 510065483693817867
+      - 728871946456137770
+    strict: true # Strict means that the permissive allowlist is ignored
   
 perms:
   owner: "SELECT owner FROM users WHERE user_id = $1"
