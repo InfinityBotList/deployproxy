@@ -1,5 +1,7 @@
 package main
 
+import "time"
+
 type Config struct {
 	Deploys map[string]Deploy `yaml:"deploys"`
 
@@ -30,6 +32,7 @@ type Deploy struct {
 	API         *DeployAPI    `yaml:"api"`
 	Bypass      *DeployBypass `yaml:"bypass"`
 	Strict      bool          `yaml:"strict"`
+	MFA         bool          `yaml:"mfa"`
 }
 
 type DeployGit struct {
@@ -50,18 +53,26 @@ type DeployBypass struct {
 	EndsWith   []string `yaml:"ends_with"`
 }
 
+type RedisSession struct {
+	UserID    string    `json:"user_id"`
+	DeployURL string    `json:"deploy_url"`
+	IP        string    `json:"ip"`
+	MFA       bool      `json:"mfa"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type Down struct {
+	Error string
+}
+
+// Views
 type LoginView struct {
 	Deploy     Deploy
 	CurrentURL string
 	Redirect   string
 }
 
-type RedisSession struct {
-	UserID    string `json:"user_id"`
-	DeployURL string `json:"deploy_url"`
-	IP        string `json:"ip"`
-}
-
-type Down struct {
-	Error string
+type MfaNewView struct {
+	Secret string
+	QRCode string
 }

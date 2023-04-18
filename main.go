@@ -52,6 +52,12 @@ func loginView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !deploy.Enabled {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("Deploy to protect not enabled: " + r.Host))
+		return
+	}
+
 	t, err := template.New("login").Parse(loginHTML)
 
 	if err != nil {
@@ -295,6 +301,8 @@ func main() {
 		panic(err)
 	}
 
+	setupMfa()
+
 	// Connect to redis
 	rOptions, err := redis.ParseURL(secrets.RedisURL)
 
@@ -382,6 +390,12 @@ func main() {
 			return
 		}
 
+		if !deploy.Enabled {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte("Deploy to protect not enabled: " + r.Host))
+			return
+		}
+
 		// Redirect to oauth2 page
 		http.Redirect(w, r, "https://discord.com/api/oauth2/authorize?client_id="+secrets.ClientID+"&redirect_uri="+deploy.URL+"/__dp/confirm&scope=identify&response_type=code&state="+r.URL.Query().Get("url"), http.StatusFound)
 	})
@@ -412,6 +426,12 @@ func main() {
 		if !ok {
 			w.WriteHeader(http.StatusNotFound)
 			w.Write([]byte("Deploy to protect not found: " + r.Host))
+			return
+		}
+
+		if !deploy.Enabled {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte("Deploy to protect not enabled: " + r.Host))
 			return
 		}
 
@@ -528,6 +548,8 @@ func main() {
 			UserID:    user.ID,
 			DeployURL: deploy.URL,
 			IP:        r.RemoteAddr,
+			MFA:       false,
+			CreatedAt: time.Now(),
 		}
 
 		sessBytes, err := json.Marshal(sess)
@@ -616,6 +638,12 @@ func main() {
 			return
 		}
 
+		if !deploy.Enabled {
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte("Deploy to protect not enabled: " + r.Host))
+			return
+		}
+
 		// Check if in bypass
 		if deploy.Bypass != nil {
 			for _, bypass := range deploy.Bypass.EndsWith {
@@ -640,6 +668,12 @@ func main() {
 			if !ok {
 				w.WriteHeader(http.StatusNotFound)
 				w.Write([]byte("Corresponding deploy not found: " + deploy.API.CorrespondingDeploy))
+				return
+			}
+
+			if !deploy.Enabled || !correspondingDeploy.Enabled {
+				w.WriteHeader(http.StatusNotFound)
+				w.Write([]byte("Deploy to protect not enabled: " + r.Host))
 				return
 			}
 
@@ -693,6 +727,12 @@ func main() {
 				if rsess.IP != r.RemoteAddr {
 					w.WriteHeader(http.StatusUnauthorized)
 					w.Write([]byte("{\"message\":\"deployproxy IP mismatch\",\"error\":true}"))
+					return
+				}
+
+				if rsess.MFA != deploy.MFA {
+					w.WriteHeader(http.StatusUnauthorized)
+					w.Write([]byte("{\"message\":\"deployproxy MFA mismatch\",\"error\":true}"))
 					return
 				}
 
@@ -781,6 +821,11 @@ func main() {
 				return
 			}
 
+			if deploy.MFA && !rsess.MFA {
+				mfaView(w, r, deploy)
+				return
+			}
+
 			// Check perms
 			if err := checkPerms(rsess.UserID, deploy); err != nil {
 				w.WriteHeader(http.StatusUnauthorized)
@@ -791,6 +836,8 @@ func main() {
 			proxy(w, r, deploy, rsess.UserID)
 		}
 	})
+
+	loadMfaRoutes(r)
 
 	// Create server
 	s := &http.Server{

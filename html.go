@@ -11,3 +11,6 @@ var downHTML string
 
 //go:embed html/common.css
 var commonCSS string
+
+//go:embed html/mfa_new.html
+var mfaNewHTML string

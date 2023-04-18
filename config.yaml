@@ -30,7 +30,7 @@ deploys:
   sl-api.infinitybots.gg:
     url: "https://sl-api.infinitybots.gg"
     description: Server Listing Experiment API
-    enabled: true
+    enabled: false
     to: http://localhost:30009
     bypass:
       ends_with:
