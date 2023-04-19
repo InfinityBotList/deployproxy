@@ -17,7 +17,7 @@ button {
     font-size: 14px;
     line-height: 1.42857143;
     padding: 10px;
-    background: #90ff1a;
+    background: #03f4fc;
     outline: none;
     border: none;
     border-radius: 4px;
@@ -25,7 +25,7 @@ button {
 
 button:hover {
     cursor: pointer;
-    background: #74d414;
+    background: #18d5db;
 }
 
 .box {
@@ -35,4 +35,20 @@ button:hover {
     box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
     margin-bottom: 20px;
     padding: 10px;
+}
+
+form input {
+    display: block;
+    margin-bottom: 10px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075);
+    width: 100%;
+}
+
+form label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
 }

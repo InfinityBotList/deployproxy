@@ -14,3 +14,6 @@ var commonCSS string
 
 //go:embed html/mfa_new.html
 var mfaNewHTML string
+
+//go:embed html/mfa_validate.html
+var mfaValidateHTML string

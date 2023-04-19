@@ -9,8 +9,8 @@
     <link rel="stylesheet" href="/__dp/common-css">
 </head>
     <h2>This deploy is protected, click the below button to login:</h2>
-    <div>
-        <p class="box">
+    <div class="box">
+        <p>
             <strong>URL: </strong>{{.Deploy.URL}}<br/>
             <strong>Current URL: </strong>{{.CurrentURL}}<br/>
             <strong>Description: </strong>{{.Deploy.Description}}<br/>
@@ -18,9 +18,12 @@
             <strong>Allowed Users: </strong>{{.Deploy.AllowedIDS}}<br/>
             <strong>Strict Protection Mode: </strong>{{.Deploy.Strict}}<br/>
             <strong>MFA Needed: </strong>{{.Deploy.MFA}}<br/>
-        </p>    
+        </p>   
+        <p>
+            <strong>Please confirm the above, then click 'Log In' to continue</strong> 
+        </p>
+        <a href="/__dp/login?url={{.Redirect}}">
+            <button type="button">Log In</button>
+        </a>    
     </div>
-    <a href="/__dp/login?url={{.Redirect}}">
-        <button type="button">Log In</button>
-    </a>
 </html>

@@ -10,18 +10,8 @@
 </head>
     <h2>MFA Setup</h2>
     <div class="box">
-        <p>
-            Since this is your first time setting up MFA. Here is the QR code to scan in your authenticator app:
-        </p>  
-        <img src="{{.QRCode}}" alt="QR Code" width="200" height="200" />
-        <p>Can't scan the QR code? Here is the secret key you can type in, instead:</p>
-        <p>
-            <strong>Secret: </strong> {{.Secret}}
-        </p>
-
-        <h3>Validate</h3>
-        <p>Note that refreshing the page will invalidate the MFA secret and generate a new one!</p>
-
+        <h3>2 Factor Authentication</h3>
+        <p>Open your authenticator app and enter the MFA code provided</p>
         <form method="post" enctype="application/x-www-form-urlencoded">
             <label for="mfa-code">MFA Code</label>
             <input type="number" id="mfa-code" name="mfa-code" placeholder="Enter MFA Code" required="true" aria-required="true" >    

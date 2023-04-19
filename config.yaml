@@ -30,17 +30,12 @@ deploys:
   sl-api.infinitybots.gg:
     url: "https://sl-api.infinitybots.gg"
     description: Server Listing Experiment API
-    enabled: false
+    enabled: true
     to: http://localhost:30009
     bypass:
       ends_with:
         - /seo
-    api:
-      corresponding_deploy: "sl.infinitybots.gg"
-      allow_headers:
-        - "Content-Type"
-        - "Authorization"
-        - "X-Client"
+    mfa: true  
   sysmanage.infinitybots.gg:
     url: "https://sysmanage.infinitybots.gg"
     description: System Management

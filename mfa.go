@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -15,7 +16,7 @@ import (
 )
 
 func loadMfaRoutes(r *chi.Mux) {
-	r.Get("/_dp/mfaImages/{hash}", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/__dp/mfaImages/{hash}", func(w http.ResponseWriter, r *http.Request) {
 		// Get image from redis
 		img, err := rdb.Get(ctx, "mfaimg:"+chi.URLParam(r, "hash")).Bytes()
 
@@ -90,9 +91,20 @@ func mfaCreateView(w http.ResponseWriter, r *http.Request, deploy Deploy, rsess 
 
 	t.Execute(w, MfaNewView{
 		Secret: key.Secret(),
-		QRCode: deploy.URL + "/_dp/mfaImages/" + qrImgHash,
+		QRCode: deploy.URL + "/__dp/mfaImages/" + qrImgHash,
 	})
+}
 
+func mfaValidateView(w http.ResponseWriter, r *http.Request, deploy Deploy) {
+	t, err := template.New("mfa_validate_html").Parse(mfaValidateHTML)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Error parsing login template"))
+		return
+	}
+
+	t.Execute(w, nil)
 }
 
 func mfaView(w http.ResponseWriter, r *http.Request, deploy Deploy) {
@@ -148,7 +160,7 @@ func mfaView(w http.ResponseWriter, r *http.Request, deploy Deploy) {
 		// Check if user has a MFA secret
 		var count int64
 
-		err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM __dp_mfa WHERE user_id = $1", rsess.UserID).Scan(&count)
+		err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM __dp_mfa WHERE user_id = $1 AND domain = $2", rsess.UserID, deploy.URL).Scan(&count)
 
 		if err != nil {
 			http.Error(w, "Internal error when checking for MFA: "+err.Error(), http.StatusInternalServerError)
@@ -158,6 +170,126 @@ func mfaView(w http.ResponseWriter, r *http.Request, deploy Deploy) {
 		if count == 0 {
 			mfaCreateView(w, r, deploy, rsess)
 			return
+		}
+
+		// Check if MFA code is validated
+		var validated bool
+
+		err = pool.QueryRow(ctx, "SELECT validated FROM __dp_mfa WHERE user_id = $1 AND domain = $2", rsess.UserID, deploy.URL).Scan(&validated)
+
+		if err != nil {
+			http.Error(w, "Internal error when checking for MFA: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if !validated {
+			// Delete old MFA secret
+			_, err = pool.Exec(ctx, "DELETE FROM __dp_mfa WHERE user_id = $1 AND domain = $2", rsess.UserID, deploy.URL)
+
+			if err != nil {
+				http.Error(w, "Internal error when deleting MFA: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			mfaCreateView(w, r, deploy, rsess)
+			return
+		}
+
+		mfaValidateView(w, r, deploy)
+	case "POST":
+		// Check if user has a MFA secret
+		var count int64
+
+		err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM __dp_mfa WHERE user_id = $1 AND domain = $2", rsess.UserID, deploy.URL).Scan(&count)
+
+		if err != nil {
+			http.Error(w, "Internal error when checking for MFA: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if count == 0 {
+			mfaCreateView(w, r, deploy, rsess)
+			return
+		}
+
+		// Get secret
+		var secret string
+
+		err = pool.QueryRow(ctx, "SELECT secret FROM __dp_mfa WHERE user_id = $1 AND domain = $2", rsess.UserID, deploy.URL).Scan(&secret)
+
+		if err != nil {
+			http.Error(w, "Internal error when checking for MFA: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Get inputted mfa-code from form
+		err = r.ParseForm()
+
+		if err != nil {
+			http.Error(w, "Internal error when parsing form: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		fmt.Println(r.Form)
+
+		mfaCode := r.Form.Get("mfa-code")
+
+		if mfaCode == "" {
+			http.Error(w, "No MFA code provided", http.StatusBadRequest)
+			return
+		}
+
+		// Validate MFA code
+		valid := totp.Validate(mfaCode, secret)
+
+		if !valid {
+			http.Error(w, "MFA code is invalid: "+mfaCode, http.StatusBadRequest)
+			return
+		}
+
+		// Set MFA as validated
+		_, err = pool.Exec(ctx, "UPDATE __dp_mfa SET validated = true WHERE user_id = $1 AND domain = $2", rsess.UserID, deploy.URL)
+
+		if err != nil {
+			http.Error(w, "Internal error when validating MFA: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Validate session
+		rsess.MFA = true
+
+		sessBytes, err := json.Marshal(rsess)
+
+		if err != nil {
+			http.Error(w, "Internal error when validating MFA: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		err = rdb.Set(ctx, cookie.Value, sessBytes, 2*time.Hour).Err()
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Error creating session"))
+			return
+		}
+
+		// Redirect to original URL
+		if r.Form.Get("js") == "" {
+			state := r.URL.Query().Get("state")
+
+			// Try to hexdecode state if not empty
+			url := ""
+
+			if state != "" {
+				urlBytes, err := hex.DecodeString(state)
+
+				if err == nil {
+					url = string(urlBytes)
+				}
+			}
+
+			// Redirect to state
+			http.Redirect(w, r, deploy.URL+url, http.StatusFound)
 		}
 	}
 }
