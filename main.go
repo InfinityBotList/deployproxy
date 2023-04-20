@@ -38,12 +38,12 @@ var (
 )
 
 const (
-	sessCookieName = "__dpsession"
-	extCookieName  = "__dpext"
-	expiryTime     = 300
+	sessCookieName       = "__dpsession"
+	extCookieName        = "__dpext"
+	sessCookieExpiryTime = 2 * time.Hour
 )
 
-func loginView(w http.ResponseWriter, r *http.Request) {
+func loginView(w http.ResponseWriter, r *http.Request, reason string) {
 	deploy, ok := config.Deploys[r.Host]
 
 	if !ok {
@@ -80,6 +80,7 @@ func loginView(w http.ResponseWriter, r *http.Request) {
 		Deploy:     deploy,
 		CurrentURL: url,
 		Redirect:   hexed,
+		Reason:     reason,
 	})
 }
 
@@ -544,10 +545,10 @@ func main() {
 		}
 
 		// Create a session
+		fmt.Println(r.RemoteAddr, r.Header.Get("X-Forwarded-For"))
 		sess := RedisSession{
 			UserID:    user.ID,
 			DeployURL: deploy.URL,
-			IP:        r.RemoteAddr,
 			MFA:       false,
 			CreatedAt: time.Now(),
 		}
@@ -561,9 +562,9 @@ func main() {
 		}
 
 		// Set session in redis
-		var sessId = crypto.RandString(256)
+		var sessId = crypto.RandString(1024)
 
-		err = rdb.Set(ctx, sessId, sessBytes, 2*time.Hour).Err()
+		err = rdb.Set(ctx, sessId, sessBytes, sessCookieExpiryTime).Err()
 
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -575,7 +576,7 @@ func main() {
 		http.SetCookie(w, &http.Cookie{
 			Name:     sessCookieName,
 			Value:    sessId,
-			Expires:  time.Now().Add(2 * time.Hour),
+			Expires:  time.Now().Add(sessCookieExpiryTime),
 			SameSite: http.SameSiteLaxMode,
 			Secure:   true,
 			HttpOnly: true,
@@ -585,7 +586,7 @@ func main() {
 		// Create cookie for external API's
 		extId := crypto.RandString(256)
 
-		err = rdb.Set(ctx, extId, sessId, 2*time.Hour).Err()
+		err = rdb.Set(ctx, extId, sessId, sessCookieExpiryTime).Err()
 
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -604,7 +605,7 @@ func main() {
 		http.SetCookie(w, &http.Cookie{
 			Name:     extCookieName,
 			Value:    extId,
-			Expires:  time.Now().Add(2 * time.Hour),
+			Expires:  time.Now().Add(sessCookieExpiryTime),
 			SameSite: http.SameSiteNoneMode,
 			Secure:   true,
 			HttpOnly: false,
@@ -724,12 +725,6 @@ func main() {
 					return
 				}
 
-				if rsess.IP != r.RemoteAddr {
-					w.WriteHeader(http.StatusUnauthorized)
-					w.Write([]byte("{\"message\":\"deployproxy IP mismatch\",\"error\":true}"))
-					return
-				}
-
 				if rsess.MFA != deploy.MFA {
 					w.WriteHeader(http.StatusUnauthorized)
 					w.Write([]byte("{\"message\":\"deployproxy MFA mismatch\",\"error\":true}"))
@@ -775,7 +770,7 @@ func main() {
 		// Check for cookie named __dpsession
 		if _, err := r.Cookie(sessCookieName); err != nil {
 			// If cookie doesn't exist, redirect to login page
-			loginView(w, r)
+			loginView(w, r, "No session found?")
 			return
 		} else {
 			// If cookie exists, check if it's valid
@@ -783,7 +778,7 @@ func main() {
 
 			if err != nil {
 				fmt.Println(err)
-				loginView(w, r)
+				loginView(w, r, "Invalid session cookie, see logs for more details")
 				return
 			}
 
@@ -791,13 +786,13 @@ func main() {
 
 			if err != nil || len(rsessBytes) == 0 {
 				fmt.Println(err)
-				loginView(w, r)
+				loginView(w, r, "Session not found on server, see logs for more details")
 				return
 			}
 
-			// Ensure extCookie also exsts
+			// Ensure extCookie also exists
 			if _, err := r.Cookie(extCookieName); err != nil {
-				loginView(w, r)
+				loginView(w, r, "External api cookie not found")
 				return
 			}
 
@@ -807,22 +802,17 @@ func main() {
 
 			if err != nil {
 				fmt.Println(err)
-				loginView(w, r)
+				loginView(w, r, "Failed to unmarshal session, see logs for more details")
 				return
 			}
 
 			if rsess.DeployURL != deploy.URL {
-				loginView(w, r)
-				return
-			}
-
-			if rsess.IP != r.RemoteAddr {
-				loginView(w, r)
+				loginView(w, r, "Session is not attached to this URL/IP configuration?")
 				return
 			}
 
 			if deploy.MFA && !rsess.MFA {
-				mfaView(w, r, deploy)
+				mfaView(w, r, deploy, cookie.Value, rsess)
 				return
 			}
 

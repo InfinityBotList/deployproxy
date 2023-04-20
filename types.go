@@ -56,7 +56,6 @@ type DeployBypass struct {
 type RedisSession struct {
 	UserID    string    `json:"user_id"`
 	DeployURL string    `json:"deploy_url"`
-	IP        string    `json:"ip"`
 	MFA       bool      `json:"mfa"`
 	CreatedAt time.Time `json:"created_at"`
 }
@@ -70,6 +69,7 @@ type LoginView struct {
 	Deploy     Deploy
 	CurrentURL string
 	Redirect   string
+	Reason     string
 }
 
 type MfaNewView struct {

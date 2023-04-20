@@ -109,56 +109,14 @@ func mfaValidateView(w http.ResponseWriter, r *http.Request, deploy Deploy) {
 	t.Execute(w, nil)
 }
 
-func mfaView(w http.ResponseWriter, r *http.Request, deploy Deploy) {
-	if !deploy.MFA {
-		http.Error(w, "Internal error: MFA not enabled for this deploy", http.StatusForbidden)
-		return
-	}
-
+func mfaView(w http.ResponseWriter, r *http.Request, deploy Deploy, sessId string, rsess RedisSession) {
 	if r.URL.Path == "/favicon.ico" {
 		http.Error(w, "blocking spurior favicon.ico request", http.StatusNotFound)
 		return
 	}
 
-	// If cookie exists, check if it's valid
-	cookie, err := r.Cookie(sessCookieName)
-
-	if err != nil {
-		fmt.Println(err)
-		loginView(w, r)
-		return
-	}
-
-	rsessBytes, err := rdb.Get(ctx, cookie.Value).Bytes()
-
-	if err != nil || len(rsessBytes) == 0 {
-		fmt.Println(err)
-		loginView(w, r)
-		return
-	}
-
-	var rsess RedisSession
-
-	err = json.Unmarshal(rsessBytes, &rsess)
-
-	if err != nil {
-		fmt.Println(err)
-		loginView(w, r)
-		return
-	}
-
-	if rsess.DeployURL != deploy.URL {
-		loginView(w, r)
-		return
-	}
-
-	if rsess.IP != r.RemoteAddr {
-		loginView(w, r)
-		return
-	}
-
 	if time.Since(rsess.CreatedAt) > 5*time.Minute {
-		loginView(w, r)
+		loginView(w, r, "MFA timed out, please relogin")
 		return
 	}
 
@@ -167,7 +125,7 @@ func mfaView(w http.ResponseWriter, r *http.Request, deploy Deploy) {
 		// Check if user has a MFA secret
 		var count int64
 
-		err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM __dp_mfa WHERE user_id = $1 AND domain = $2", rsess.UserID, deploy.URL).Scan(&count)
+		err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM __dp_mfa WHERE user_id = $1 AND domain = $2", rsess.UserID, deploy.URL).Scan(&count)
 
 		if err != nil {
 			http.Error(w, "Internal error when checking for MFA: "+err.Error(), http.StatusInternalServerError)
@@ -207,7 +165,7 @@ func mfaView(w http.ResponseWriter, r *http.Request, deploy Deploy) {
 		// Check if user has a MFA secret
 		var count int64
 
-		err = pool.QueryRow(ctx, "SELECT COUNT(*) FROM __dp_mfa WHERE user_id = $1 AND domain = $2", rsess.UserID, deploy.URL).Scan(&count)
+		err := pool.QueryRow(ctx, "SELECT COUNT(*) FROM __dp_mfa WHERE user_id = $1 AND domain = $2", rsess.UserID, deploy.URL).Scan(&count)
 
 		if err != nil {
 			http.Error(w, "Internal error when checking for MFA: "+err.Error(), http.StatusInternalServerError)
@@ -272,7 +230,7 @@ func mfaView(w http.ResponseWriter, r *http.Request, deploy Deploy) {
 			return
 		}
 
-		err = rdb.Set(ctx, cookie.Value, sessBytes, 2*time.Hour).Err()
+		err = rdb.Set(ctx, sessId, sessBytes, 2*time.Hour).Err()
 
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
