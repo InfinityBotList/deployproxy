@@ -31,7 +31,7 @@ func loadMfaRoutes(r *chi.Mux) {
 }
 
 func setupMfa() {
-	_, err := pool.Exec(ctx, "CREATE TABLE IF NOT EXISTS __dp_mfa (user_id TEXT PRIMARY KEY, secret TEXT, domain TEXT NOT NULL, validated BOOL DEFAULT FALSE)")
+	_, err := pool.Exec(ctx, "CREATE TABLE IF NOT EXISTS __dp_mfa (user_id TEXT NOT NULL, secret TEXT, domain TEXT NOT NULL, validated BOOL DEFAULT FALSE)")
 
 	if err != nil {
 		panic("Failed to create mfa table:" + err.Error())
@@ -50,7 +50,9 @@ func mfaCreateView(w http.ResponseWriter, r *http.Request, deploy Deploy, rsess 
 		return
 	}
 
-	_, err = pool.Exec(ctx, "INSERT INTO __dp_mfa (user_id, secret, domain) VALUES ($1, $2, $3)", rsess.UserID, key.Secret(), deploy.URL)
+	secret := key.Secret()
+
+	_, err = pool.Exec(ctx, "INSERT INTO __dp_mfa (user_id, secret, domain) VALUES ($1, $2, $3)", rsess.UserID, secret, deploy.URL)
 
 	if err != nil {
 		http.Error(w, "Internal error when creating MFA: "+err.Error(), http.StatusInternalServerError)
@@ -90,7 +92,7 @@ func mfaCreateView(w http.ResponseWriter, r *http.Request, deploy Deploy, rsess 
 	}
 
 	t.Execute(w, MfaNewView{
-		Secret: key.Secret(),
+		Secret: secret,
 		QRCode: deploy.URL + "/__dp/mfaImages/" + qrImgHash,
 	})
 }
@@ -110,6 +112,11 @@ func mfaValidateView(w http.ResponseWriter, r *http.Request, deploy Deploy) {
 func mfaView(w http.ResponseWriter, r *http.Request, deploy Deploy) {
 	if !deploy.MFA {
 		http.Error(w, "Internal error: MFA not enabled for this deploy", http.StatusForbidden)
+		return
+	}
+
+	if r.URL.Path == "/favicon.ico" {
+		http.Error(w, "blocking spurior favicon.ico request", http.StatusNotFound)
 		return
 	}
 
