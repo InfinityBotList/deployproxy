@@ -40,6 +40,7 @@ deploys:
     url: "https://sysmanage.infinitybots.gg"
     description: System Management
     enabled: true
+    mfa: true
     to: http://localhost:30010
     allowed_ids:
       - 510065483693817867
