@@ -33,6 +33,7 @@ type Deploy struct {
 	Bypass      *DeployBypass `yaml:"bypass"`
 	Strict      bool          `yaml:"strict"`
 	MFA         bool          `yaml:"mfa"`
+	CheckIP     bool          `yaml:"check_ip"` // Only enable if you can be sure that IPs will not change, seems to be broken under Discord right now
 }
 
 type DeployGit struct {
@@ -58,6 +59,7 @@ type RedisSession struct {
 	DeployURL string    `json:"deploy_url"`
 	MFA       bool      `json:"mfa"`
 	CreatedAt time.Time `json:"created_at"`
+	IP        string    `json:"ip"`
 }
 
 type Down struct {

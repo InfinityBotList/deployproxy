@@ -551,6 +551,13 @@ func main() {
 			DeployURL: deploy.URL,
 			MFA:       false,
 			CreatedAt: time.Now(),
+			IP: func() string {
+				if deploy.CheckIP {
+					return r.RemoteAddr
+				}
+
+				return ""
+			}(),
 		}
 
 		sessBytes, err := json.Marshal(sess)
@@ -719,9 +726,9 @@ func main() {
 					return
 				}
 
-				if rsess.DeployURL != correspondingDeploy.URL {
+				if rsess.DeployURL != correspondingDeploy.URL || (correspondingDeploy.CheckIP && rsess.IP != r.RemoteAddr) {
 					w.WriteHeader(http.StatusUnauthorized)
-					w.Write([]byte("{\"message\":\"deployproxy DeployURL mismatch\",\"error\":true}"))
+					w.Write([]byte("{\"message\":\"deployproxy URL/IP mismatch\",\"error\":true}"))
 					return
 				}
 
@@ -806,7 +813,7 @@ func main() {
 				return
 			}
 
-			if rsess.DeployURL != deploy.URL {
+			if rsess.DeployURL != deploy.URL || (deploy.CheckIP && rsess.IP != r.RemoteAddr) {
 				loginView(w, r, "Session is not attached to this URL/IP configuration?")
 				return
 			}
