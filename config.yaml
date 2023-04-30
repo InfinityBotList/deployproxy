@@ -42,11 +42,11 @@ deploys:
     strict: true # Strict means that the permissive allowlist is ignored
   vivum.botlist.app:
     url: "https://vivum.botlist.app"
-    description: VIVUM
+    description: Vivum Internal Infrastructure. You must be in a department to access this.
     enabled: true
     to: http://localhost:49104
     strict: true # Strict means that the permissive allowlist is ignored
-    hide_login_html: true
+    hide_login_html: false
 
 perms:
   owner: "SELECT owner FROM users WHERE user_id = $1"
