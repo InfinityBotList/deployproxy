@@ -194,7 +194,7 @@ func proxy(w http.ResponseWriter, r *http.Request, deploy Deploy, userId string)
 	}
 
 	// Create a hmac hash of the DPSecret
-	dpSecret, ok := secrets.DPSecret[deploy.URL]
+	dpSecret, ok := secrets.DPSecret[r.Host]
 
 	if ok {
 		t := time.Now().Unix()
