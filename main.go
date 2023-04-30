@@ -21,8 +21,11 @@ import (
 	"golang.org/x/exp/slices"
 	"gopkg.in/yaml.v3"
 
+	"flag"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-playground/validator/v10"
 	"github.com/infinitybotlist/eureka/crypto"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -74,6 +77,11 @@ func loginView(w http.ResponseWriter, r *http.Request, reason string) {
 	}
 
 	hexed := hex.EncodeToString([]byte(url))
+
+	if deploy.HideLoginHTML {
+		http.Redirect(w, r, "/__dp/login?url="+hexed, http.StatusTemporaryRedirect)
+		return
+	}
 
 	w.WriteHeader(http.StatusUnauthorized)
 	t.Execute(w, LoginView{
@@ -261,8 +269,23 @@ func checkPerms(userId string, deploy Deploy) error {
 }
 
 func main() {
+	var configFile = flag.String("config", "config.yaml", "Path to config.yaml [default: config.yaml]")
+	var secretsFile = flag.String("secrets", "secrets.yaml", "Path to secrets.yaml [default: secrets.yaml]")
+
+	flag.Parse()
+
+	if configFile == nil || *configFile == "" {
+		fmt.Println("No config file specified")
+		os.Exit(1)
+	}
+
+	if secretsFile == nil || *secretsFile == "" {
+		fmt.Println("No secrets file specified")
+		os.Exit(1)
+	}
+
 	// Load config.yaml into Config struct
-	file, err := os.Open("config.yaml")
+	file, err := os.Open(*configFile)
 
 	if err != nil {
 		panic(err)
@@ -278,8 +301,16 @@ func main() {
 		panic(err)
 	}
 
+	v := validator.New()
+
+	err = v.Struct(config)
+
+	if err != nil {
+		panic(err)
+	}
+
 	// Load secrets.yaml into Secrets struct
-	file, err = os.Open("secrets.yaml")
+	file, err = os.Open(*secretsFile)
 
 	if err != nil {
 		panic(err)
@@ -838,7 +869,7 @@ func main() {
 
 	// Create server
 	s := &http.Server{
-		Addr:    ":1234",
+		Addr:    ":" + strconv.Itoa(config.Port),
 		Handler: r,
 	}
 

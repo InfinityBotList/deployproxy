@@ -3,21 +3,6 @@ deploys:
   sl.infinitybots.gg:
     # The URL with protocol
     url: "https://sl.infinitybots.gg"
-    # Git settings
-    git:
-      # The repo fullname. Format: username/repo
-      github_repo: "InfinityBotList/Infinity-Next"
-      # The folder of the service
-      path: /root/priv-sl
-      # The ref to check+pull
-      github_ref: "refs/heads/priv-serverlist"
-      # The service name in systemd
-      service: "priv-sl"
-      # Build commands
-      build_commands:
-        - "yarn install"
-        - "yarn install --dev"
-        - "yarn run build"
     # The service description
     description: Server Listing Experiment. Needs admin+
     # The permissions needed for the service
@@ -59,3 +44,5 @@ deploys:
 perms:
   owner: "SELECT owner FROM users WHERE user_id = $1"
   admin: "SELECT admin FROM users WHERE user_id = $1"
+
+port: 1234
