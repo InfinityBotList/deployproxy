@@ -13,12 +13,12 @@ type Config struct {
 }
 
 type Secrets struct {
-	ClientID     string `yaml:"client_id" validate:"required"`
-	ClientSecret string `yaml:"client_secret" validate:"required"`
-	DatabaseURL  string `yaml:"database_url" validate:"required"`
-	RedisURL     string `yaml:"redis_url" validate:"required"`
-	BotToken     string `yaml:"bot_token" validate:"required"`
-	DPSecret     string `yaml:"dp_secret" validate:"required"`
+	ClientID     string            `yaml:"client_id" validate:"required"`
+	ClientSecret string            `yaml:"client_secret" validate:"required"`
+	DatabaseURL  string            `yaml:"database_url" validate:"required"`
+	RedisURL     string            `yaml:"redis_url" validate:"required"`
+	BotToken     string            `yaml:"bot_token" validate:"required"`
+	DPSecret     map[string]string `yaml:"dp_secret" validate:"required"`
 }
 
 type Deploy struct {
