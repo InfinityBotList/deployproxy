@@ -1,26 +1,4 @@
 deploys:
-  # The hostname
-  sl.infinitybots.gg:
-    # The URL with protocol
-    url: "https://sl.infinitybots.gg"
-    # The service description
-    description: Server Listing Experiment. Needs admin+
-    # The permissions needed for the service
-    perms:
-      - admin
-    # Whether the service is enabled for viewing
-    enabled: true
-    # The host to proxy to
-    to: http://localhost:30008
-  sl-api.infinitybots.gg:
-    url: "https://sl-api.infinitybots.gg"
-    description: Server Listing Experiment API
-    enabled: true
-    to: http://localhost:30009
-    bypass:
-      ends_with:
-        - /seo
-    mfa: true  
   sysmanage.infinitybots.gg:
     url: "https://sysmanage.infinitybots.gg"
     description: System Management
