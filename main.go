@@ -83,7 +83,7 @@ func loginView(w http.ResponseWriter, r *http.Request, reason string) {
 		return
 	}
 
-	if !deploy.AllowCORSInDP {
+	if deploy.AllowCORSInDP {
 		// Set CORS headers
 		origin := r.Header.Get("Origin")
 		if origin == "" {
@@ -129,7 +129,7 @@ func downView(w http.ResponseWriter, r *http.Request, reason string) {
 		return
 	}
 
-	if !deploy.AllowCORSInDP {
+	if deploy.AllowCORSInDP {
 		// Set CORS headers
 		origin := r.Header.Get("Origin")
 		if origin == "" {
