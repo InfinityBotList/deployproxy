@@ -84,6 +84,18 @@ func loginView(w http.ResponseWriter, r *http.Request, reason string) {
 	}
 
 	w.WriteHeader(http.StatusUnauthorized)
+
+	// Set CORS headers
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		origin = "*"
+	}
+	
+	w.Header().Set("Access-Control-Allow-Origin", origin)
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Credentials", "true")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	
 	t.Execute(w, LoginView{
 		Deploy:     deploy,
 		CurrentURL: url,
@@ -102,6 +114,18 @@ func downView(w http.ResponseWriter, r *http.Request, reason string) {
 	}
 
 	w.WriteHeader(http.StatusRequestTimeout)
+
+	// Set CORS headers
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		origin = "*"
+	}
+	
+	w.Header().Set("Access-Control-Allow-Origin", origin)
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Credentials", "true")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+	
 	t.Execute(w, Down{
 		Error: reason,
 	})
