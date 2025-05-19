@@ -32,6 +32,7 @@ type Deploy struct {
 	API           *DeployAPI    `yaml:"api"`
 	Bypass        *DeployBypass `yaml:"bypass"`
 	Strict        bool          `yaml:"strict"`
+	AllowCORSInDP bool	    `yaml:"allow_cors_in_dp"`
 	MFA           bool          `yaml:"mfa"`
 	CheckIP       bool          `yaml:"check_ip"`        // Only enable if you can be sure that IPs will not change, seems to be broken under Discord right now
 	HideLoginHTML bool          `yaml:"hide_login_html"` // Disables the login page and directly redirects to Discord
