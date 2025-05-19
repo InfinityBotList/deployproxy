@@ -83,16 +83,18 @@ func loginView(w http.ResponseWriter, r *http.Request, reason string) {
 		return
 	}
 
-	// Set CORS headers
-	origin := r.Header.Get("Origin")
-	if origin == "" {
-		origin = "*"
+	if !deploy.Secure {
+		// Set CORS headers
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			origin = "*"
+		}
+		
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	}
-	
-	w.Header().Set("Access-Control-Allow-Origin", origin)
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Credentials", "true")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 	w.WriteHeader(http.StatusUnauthorized)
 	
@@ -105,6 +107,20 @@ func loginView(w http.ResponseWriter, r *http.Request, reason string) {
 }
 
 func downView(w http.ResponseWriter, r *http.Request, reason string) {
+	deploy, ok := config.Deploys[r.Host]
+
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("Deploy to protect not found: " + r.Host))
+		return
+	}
+
+	if !deploy.Enabled {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("Deploy to protect not enabled: " + r.Host))
+		return
+	}
+	
 	t, err := template.New("down").Parse(downHTML)
 
 	if err != nil {
@@ -113,16 +129,18 @@ func downView(w http.ResponseWriter, r *http.Request, reason string) {
 		return
 	}
 
-	// Set CORS headers
-	origin := r.Header.Get("Origin")
-	if origin == "" {
-		origin = "*"
+	if !deploy.Secure {
+		// Set CORS headers
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			origin = "*"
+		}
+		
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 	}
-	
-	w.Header().Set("Access-Control-Allow-Origin", origin)
-	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-	w.Header().Set("Access-Control-Allow-Credentials", "true")
-	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 
 	w.WriteHeader(http.StatusRequestTimeout)
 	
