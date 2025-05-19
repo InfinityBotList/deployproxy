@@ -84,12 +84,12 @@ func loginView(w http.ResponseWriter, r *http.Request, reason string) {
 	}
 
 	if deploy.AllowCORSInDP {
-		// Set CORS headers
 		origin := r.Header.Get("Origin")
 		if origin == "" {
 			origin = "*"
 		}
 		
+		// Set CORS headers		
 		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -744,6 +744,16 @@ func main() {
 					proxy(w, r, deploy, "")
 					return
 				}
+			}
+		}
+
+		// Ensure valid Origin header from browser if sent
+		origin := r.Header.Get("Origin")
+		if origin != "" {
+			if !slices.Contains(deploy.CORSOrigins, origin) {
+				w.WriteHeader(http.StatusUnauthorized)
+				w.Write([]byte("Origin header is not allowed"))
+				return
 			}
 		}
 
