@@ -749,7 +749,7 @@ func main() {
 
 		// Ensure valid Origin header from browser if sent
 		origin := r.Header.Get("Origin")
-		if origin != "" {
+		if origin != "" && len(deploy.CORSOrigins) > 0 {
 			if !slices.Contains(deploy.CORSOrigins, origin) {
 				w.WriteHeader(http.StatusUnauthorized)
 				w.Write([]byte("Origin header is not allowed"))
