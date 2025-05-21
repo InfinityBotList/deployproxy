@@ -150,26 +150,6 @@ func downView(w http.ResponseWriter, r *http.Request, reason string) {
 }
 
 func proxy(w http.ResponseWriter, r *http.Request, deploy Deploy, userId string) {
-	var allowedHeaders = []string{
-		"Content-Type",
-		"Content-Encoding",
-		"Content-Security-Policy",
-		"Access-Control-Allow-Origin",
-		"Access-Control-Allow-Methods",
-		"Access-Control-Allow-Headers",
-		"Access-Control-Allow-Credentials",
-		"Access-Control-Max-Age",
-		"Access-Control-Expose-Headers",
-		"Access-Control-Request-Headers",
-		"Access-Control-Request-Method",
-		"Accept",
-		"Accept-Encoding",
-		"Accept-Language",
-		"Location",
-	}
-
-	// Proxy request to To
-
 	// Special case optimization for OPTIONS requests, no need to send/read the body
 	if r.Method == "OPTIONS" {
 		// Fetch request, no body should be sent
@@ -200,7 +180,7 @@ func proxy(w http.ResponseWriter, r *http.Request, deploy Deploy, userId string)
 		}
 
 		for k, v := range resp.Header {
-			if strings.HasPrefix("X-", k) || slices.Contains(allowedHeaders, k) {
+			if k != "Host" {
 				w.Header()[k] = v
 			}
 		}
@@ -253,7 +233,7 @@ func proxy(w http.ResponseWriter, r *http.Request, deploy Deploy, userId string)
 		req.Header.Set("X-DP-Timestamp", strconv.Itoa(int(t)))
 	}
 
-	req.Header.Set("X-Forwarded-For", deploy.URL)
+	req.Header.Set("X-Forwarded-Host", r.Host)
 	req.Header.Set("X-DP-Host", deploy.URL)
 
 	resp, err := cli.Do(req)
@@ -266,7 +246,7 @@ func proxy(w http.ResponseWriter, r *http.Request, deploy Deploy, userId string)
 	defer resp.Body.Close()
 
 	for k, v := range resp.Header {
-		if strings.HasPrefix(k, "X-") || slices.Contains(allowedHeaders, k) {
+		if k != "Host" {
 			w.Header()[k] = v
 		}
 	}
