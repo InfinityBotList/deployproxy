@@ -253,6 +253,7 @@ func proxy(w http.ResponseWriter, r *http.Request, deploy Deploy, userId string)
 		req.Header.Set("X-DP-Timestamp", strconv.Itoa(int(t)))
 	}
 
+	req.Header.Set("X-Forwarded-For", deploy.URL)
 	req.Header.Set("X-DP-Host", deploy.URL)
 
 	resp, err := cli.Do(req)

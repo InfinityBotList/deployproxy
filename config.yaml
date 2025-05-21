@@ -1,30 +1,38 @@
 deploys:
-  sysmanage.infinitybots.gg:
-    url: "https://sysmanage.infinitybots.gg"
-    description: System Management
+  system.purrquinox.com:
+    url: "https://system.purrquinox.com"
+    description: Hello, there. This is a Internal System Resources Manager for Purrquinox and our services!
     enabled: true
     mfa: true
-    to: http://localhost:30010
+    to: http://localhost:29393
     allowed_ids:
-      - 510065483693817867
+      - 564164277251080208
       - 728871946456137770
+      - 775855009421066262
     strict: true # Strict means that the permissive allowlist is ignored
-  helpernode-metro.infinitybots.gg:
-    url: "https://helpernode-metro.infinitybots.gg"
-    description: Metro Helper Node System Management
+  splashtail-sec.antiraid.xyz:
+    url: "https://splashtail-sec.antiraid.xyz"
+    description: "Secure access to splashtail mewld etc."
     enabled: true
-    to: http://100.104.199.117:30010
+    mfa: true
+    to: http://localhost:5600
     allowed_ids:
-      - 510065483693817867
+      - 564164277251080208
       - 728871946456137770
+      - 775855009421066262
     strict: true # Strict means that the permissive allowlist is ignored
-  vivum.botlist.app:
-    url: "https://vivum.botlist.app"
-    description: Vivum Internal Infrastructure. You must be in a department to access this.
+  staffapi-s3.antiraid.xyz:
+    url: "https://staffapi-s3.antiraid.xyz"
+    description: "S3 file viewer"
     enabled: true
-    to: http://localhost:49104
-    strict: true # Strict means that the permissive allowlist is ignored
-    hide_login_html: false
+    mfa: true
+    to: http://localhost:8334
+    strict: true
+    allowed_ids:
+      # Highly sensitive, even compared to other staffapi functions
+      - 564164277251080208
+      - 728871946456137770
+      - 775855009421066262
 
 perms:
   owner: "SELECT owner FROM users WHERE user_id = $1"
